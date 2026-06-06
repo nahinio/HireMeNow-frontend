@@ -1,247 +1,46 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sign In — HireMeNow</title>
-    <meta
-      name="description"
-      content="Sign in or create your HireMeNow account."
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="./assets/css/base.css" />
-    <link rel="stylesheet" href="./assets/css/auth.css" />
-  </head>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HireMeNow</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="logo" data-nav="/" href="#/">HireMeNow</a>
+    <nav class="nav-main">
+      <a data-nav="/jobs" href="#/jobs">Jobs</a>
+      <a data-nav="/freelancers" href="#/freelancers">Freelancers</a>
+      <a data-nav="/courses" href="#/courses">Courses</a>
+      <span id="nav-role" class="nav-role"></span>
+    </nav>
+    <div id="nav-auth" class="nav-auth"></div>
+  </header>
 
-  <body>
-    <div class="auth-page">
-      <div class="auth-card">
-        <!-- Brand Panel -->
-        <div class="auth-brand">
-          <div class="auth-brand-content">
-            <div class="auth-brand-logo">HireMeNow</div>
-            <p class="auth-brand-tagline">Premium Freelance Marketplace</p>
-            <div class="auth-brand-decoration">
-              <div class="auth-brand-pill">
-                <span class="auth-brand-pill-dot"></span>
-                <span class="auth-brand-pill-text"
-                  >12,000+ Active Projects</span
-                >
-              </div>
-              <div class="auth-brand-pill">
-                <span class="auth-brand-pill-dot"></span>
-                <span class="auth-brand-pill-text">Verified Skill Quizzes</span>
-              </div>
-              <div class="auth-brand-pill">
-                <span class="auth-brand-pill-dot"></span>
-                <span class="auth-brand-pill-text">Instant Applications</span>
-              </div>
-            </div>
-          </div>
-        </div>
+  <main id="main" class="main"></main>
 
-        <!-- Form Panel -->
-        <div class="auth-form-panel">
-          <div class="auth-form-inner">
-            <!-- Role Toggle -->
-            <div class="role-toggle" role="group" aria-label="Select role">
-              <button
-                class="role-toggle-btn active"
-                data-role="freelancer"
-                type="button"
-              >
-                Freelancer
-              </button>
-              <button class="role-toggle-btn" data-role="client" type="button">
-                Client
-              </button>
-              <button class="role-toggle-btn" data-role="admin" type="button">
-                Admin
-              </button>
-            </div>
+  <footer class="site-footer">
+    <p>HireMeNow — Freelancer marketplace</p>
+  </footer>
 
-            <!-- Tabs -->
-            <div class="auth-tabs" role="tablist">
-              <button
-                class="auth-tab active"
-                data-tab="login"
-                role="tab"
-                aria-selected="true"
-                type="button"
-              >
-                Login
-              </button>
-              <button
-                class="auth-tab"
-                data-tab="signup"
-                role="tab"
-                aria-selected="false"
-                type="button"
-              >
-                Sign Up
-              </button>
-            </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-            <!-- Status -->
-            <div
-              id="auth-status"
-              class="auth-status"
-              style="display: none"
-            ></div>
-
-            <!-- Login Form -->
-            <form id="login-form" class="auth-form visible" novalidate>
-              <div class="form-group">
-                <label class="form-label" for="login-email"
-                  >Email Address</label
-                >
-                <input
-                  class="input"
-                  type="email"
-                  id="login-email"
-                  placeholder="name@company.com"
-                  autocomplete="email"
-                  required
-                />
-                <span class="form-error" id="login-email-error"></span>
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="login-password">Password</label>
-                <div style="position: relative">
-                  <input
-                    class="input"
-                    type="password"
-                    id="login-password"
-                    placeholder="••••••••"
-                    autocomplete="current-password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    data-toggle-pw="login-password"
-                    style="
-                      position: absolute;
-                      right: 16px;
-                      top: 50%;
-                      transform: translateY(-50%);
-                      background: none;
-                      border: none;
-                      cursor: pointer;
-                      color: var(--text-muted);
-                      display: flex;
-                      align-items: center;
-                    "
-                    aria-label="Toggle password"
-                  >
-                    <svg
-                      class="eye-open"
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      style="display: block"
-                    >
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    <svg
-                      class="eye-closed"
-                      width="15"
-                      height="15"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      style="display: none"
-                    >
-                      <path
-                        d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"
-                      />
-                      <line x1="1" y1="1" x2="23" y2="23" />
-                    </svg>
-                  </button>
-                </div>
-                <span class="form-error" id="login-password-error"></span>
-              </div>
-              <a
-                href="./freelancer/freelancer-dashboard.html"
-                class="form-submit"
-                style="
-                  text-decoration: none;
-                  color: inherit;
-                  display: inline-block;
-                  text-align: center;
-                  padding: 15px 20px;
-                "
-                >Sign In</a
-              >
-            </form>
-
-            <div class="divider"><span>or</span></div>
-
-            <a href="./pages/jobs.html" class="oauth-btn">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              Browse Jobs as Guest
-            </a>
-
-            <p class="auth-terms">
-              By continuing, you agree to our <a href="#">Terms</a> &amp;
-              <a href="#">Privacy Policy</a>
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Onboarding Modal -->
-    <div id="onboarding-modal" class="modal-overlay" style="display: none">
-      <div class="modal-box">
-        <div class="modal-icon">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-        </div>
-        <h2 class="modal-title">Unlock Job Applications</h2>
-        <p class="modal-desc">
-          HireMeNow verifies expertise via skill quizzes. Pass with
-          <strong>80%+</strong> to unlock the Apply button for matching jobs.
-        </p>
-        <div class="modal-actions">
-          <button class="btn btn-primary btn-tall" id="onboard-yes">
-            Take a Skill Quiz
-          </button>
-          <button class="btn btn-ghost btn-tall" id="onboard-skip">
-            Skip for Now
-          </button>
-        </div>
-      </div>
-    </div>
-  </body>
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/components.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/pages/home.js"></script>
+  <script src="js/pages/auth.js"></script>
+  <script src="js/pages/jobs.js"></script>
+  <script src="js/pages/public.js"></script>
+  <script src="js/pages/freelancer.js"></script>
+  <script src="js/pages/client.js"></script>
+  <script src="js/pages/messages.js"></script>
+  <script src="js/pages/admin.js"></script>
+  <script src="js/app.js"></script>
+</body>
 </html>
