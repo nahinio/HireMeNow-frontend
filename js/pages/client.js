@@ -1,3 +1,27 @@
+const JOB_DESCRIPTION_PLACEHOLDER = `About the role
+Summarize the project, team, and what success looks like in this role.
+
+Responsibilities
+• Primary deliverables and day-to-day tasks
+• Tools, frameworks, or workflows the freelancer will use
+• Collaboration with your team (design, product, engineering, etc.)
+• Quality standards, testing, or documentation expectations
+
+Requirements — Education
+Degree, certifications, or equivalent practical experience you will accept.
+
+Requirements — Experience
+Years of experience, portfolio examples, or must-have skills beyond the verified badges above.
+
+Requirements — Additional
+Nice-to-haves, timezone overlap, language, contract length, or working style preferences.
+
+Compensation & benefits
+Salary or rate (or write "Negotiable"), contract type, paid time off, learning budget, remote policy, etc.
+
+About the company
+Brief intro to your company — mission, industry, team size, and why freelancers enjoy working with you.`;
+
 Object.assign(Pages, {
   async clientDashboard() {
     if (!Auth.requireRole(['client'])) return '';
@@ -118,10 +142,12 @@ Object.assign(Pages, {
               ${Components.skillPicker(skills)}
             </div>
 
-            <div class="job-post-field">
+            <div class="job-post-field job-post-field-description">
               <label for="job-description">Description</label>
-              <textarea id="job-description" name="description" rows="5" required
-                placeholder="Briefly describe the role and what the freelancer will do."></textarea>
+              <p class="job-post-hint">Use the sections below as a guide — replace each line with your job details before publishing.</p>
+              <textarea id="job-description" name="description" rows="16" required
+                class="job-post-description"
+                placeholder="${Utils.escapeHtml(JOB_DESCRIPTION_PLACEHOLDER)}"></textarea>
             </div>
 
             <details class="job-post-extra">

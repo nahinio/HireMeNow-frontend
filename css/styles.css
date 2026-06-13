@@ -3358,6 +3358,11 @@ body.layout-public-portal .admin-panel-secondary {
   line-height: 1.5;
 }
 
+.job-post-field-description textarea.job-post-description {
+  min-height: 18rem;
+  line-height: 1.55;
+}
+
 .job-post-field input:focus,
 .job-post-field textarea:focus {
   outline: none;
