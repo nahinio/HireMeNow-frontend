@@ -415,6 +415,7 @@ Object.assign(Pages, {
     const role = params.role || '';
 
     let data;
+    let loadError = '';
     try {
       data = await Api.get('/admin/users', {
         query: {
@@ -427,8 +428,13 @@ Object.assign(Pages, {
       });
     } catch (err) {
       if (err?.handled) return false;
+      loadError = Utils.parseApiError(err);
       data = { items: [], page: 1, limit: 50, total: 0 };
     }
+
+    const userTable = loadError
+      ? `<div class="admin-empty-panel admin-error-panel">${Components.emptyState(loadError)}</div>`
+      : Components.adminUsersTable(data.items || []);
 
     const filterParams = { q: q || undefined, role: role || undefined };
     const chips = [];
@@ -462,7 +468,7 @@ Object.assign(Pages, {
             chips,
             clearParams: filterParams,
           })}
-          ${Components.adminUsersTable(data.items || [])}
+          ${userTable}
           ${Components.pagination(data.page, data.limit, data.total, '/admin/users', filterParams)}`,
       })}`;
 
