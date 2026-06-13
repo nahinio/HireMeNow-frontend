@@ -294,7 +294,7 @@ Object.assign(Pages, {
       body: Components.adminReportsTable(data.items || [], { withActions: true }),
     });
 
-    return AdminPages.wrap('/admin/reports', 'User reports', '', body);
+    return AdminPages.wrap('/admin/reports', 'Reports', 'Review reported users and delete profiles when approved', body);
   },
 
   async adminJobs() {
@@ -399,7 +399,7 @@ Object.assign(Pages, {
     AdminPages.ensureNavMetrics();
     return AdminPages.wrap(
       '/admin/users',
-      'User moderation',
+      'Users',
       '',
       '<div class="loading-inline">Loading users…</div>',
     );
@@ -462,34 +462,11 @@ Object.assign(Pages, {
             chips,
             clearParams: filterParams,
           })}
-          ${Components.adminUsersTable(data.items || [], { withActions: true })}
+          ${Components.adminUsersTable(data.items || [])}
           ${Components.pagination(data.page, data.limit, data.total, '/admin/users', filterParams)}`,
-      })}
-      <div class="admin-compose-grid admin-users-actions">
-        ${Components.adminComposePanel({
-          label: 'Account action',
-          title: 'Ban user',
-          body: `
-            <form class="admin-compose-form" data-form="adminBanUser" id="admin-ban-user-form">
-              <p class="admin-form-hint">Ban blocks login and removes pending activity. Use the table above or enter a user ID.</p>
-              ${Components.field('User ID', 'user_id', 'text', '', 'required placeholder="00000000-0000-0000-0000-000000000000"')}
-              ${Components.field('Ban reason', 'ban_reason', 'textarea', '', 'required rows="3"')}
-            </form>`,
-          footer: '<button type="submit" form="admin-ban-user-form" class="btn btn-danger">Ban user</button>',
-        })}
-        ${Components.adminComposePanel({
-          label: 'Content action',
-          title: 'Delete review',
-          body: `
-            <form class="admin-compose-form" data-form="adminDeleteReview" id="admin-delete-review-form">
-              <p class="admin-form-hint">Remove an inappropriate or fraudulent review by ID.</p>
-              ${Components.field('Review ID', 'review_id', 'text', '', 'required placeholder="00000000-0000-0000-0000-000000000000"')}
-            </form>`,
-          footer: '<button type="submit" form="admin-delete-review-form" class="btn btn-danger">Delete review</button>',
-        })}
-      </div>`;
+      })}`;
 
-    return AdminPages.wrap('/admin/users', 'User moderation', '', body);
+    return AdminPages.wrap('/admin/users', 'Users', 'All clients and freelancers', body);
   },
 
   adminSkillEditShell() {
@@ -745,76 +722,18 @@ FormHandlers.adminCreateCourse = async (form) => {
   }
 };
 
-FormHandlers.adminBanUser = async (form) => {
-  const fd = new FormData(form);
-  if (!confirm('Ban this user?')) return;
-  try {
-    const res = await Api.post(`/admin/users/${fd.get('user_id')}/ban`, {
-      ban_reason: fd.get('ban_reason'),
-    });
-    Utils.showToast(`User banned (${res.role})`, 'success');
-    form.reset();
-    Router.render();
-  } catch (err) {
-    Utils.showToast(Utils.parseApiError(err), 'error');
-  }
-};
-
-FormHandlers.adminDeleteReview = async (form) => {
-  const fd = new FormData(form);
-  if (!confirm('Delete this review?')) return;
-  try {
-    await Api.delete(`/admin/reviews/${fd.get('review_id')}`);
-    Utils.showToast('Review deleted', 'success');
-    form.reset();
-  } catch (err) {
-    Utils.showToast(Utils.parseApiError(err), 'error');
-  }
-};
-
 document.addEventListener('click', async (e) => {
-  const deleteBtn = e.target.closest('.delete-admin-user');
-  if (deleteBtn) {
-    const id = deleteBtn.dataset.id;
-    const name = deleteBtn.dataset.name || 'this user';
-    const role = deleteBtn.dataset.role || 'user';
-    if (!confirm(`Permanently delete ${name}? Their ${role} profile will be removed and they cannot log in again.`)) return;
-    try {
-      await Api.delete(`/admin/users/${id}`);
-      Utils.showToast(`${name} deleted`, 'success');
-      Router.render();
-    } catch (err) {
-      Utils.showToast(Utils.parseApiError(err), 'error');
-    }
-    return;
-  }
-
-  const banBtn = e.target.closest('.ban-admin-user');
-  if (banBtn) {
-    const id = banBtn.dataset.id;
-    const name = banBtn.dataset.name || 'this user';
-    const reason = prompt(`Ban reason for ${name}:`);
-    if (!reason || !reason.trim()) return;
-    if (!confirm(`Ban ${name}?`)) return;
-    try {
-      await Api.post(`/admin/users/${id}/ban`, { ban_reason: reason.trim() });
-      Utils.showToast(`${name} banned`, 'success');
-      Router.render();
-    } catch (err) {
-      Utils.showToast(Utils.parseApiError(err), 'error');
-    }
-    return;
-  }
-
   if (e.target.classList.contains('resolve-report')) {
     const id = e.target.dataset.id;
     const status = e.target.dataset.status;
-    const msg = status === 'approved' ? 'Approve report and delete reported user?' : 'Reject report?';
+    const msg = status === 'approved'
+      ? 'Delete this reported user\'s profile permanently?'
+      : 'Dismiss this report without deleting the user?';
     if (!confirm(msg)) return;
     try {
       await Api.patch(`/admin/reports/${id}`, { status });
       AdminPages.invalidateMetrics();
-      Utils.showToast('Report resolved', 'success');
+      Utils.showToast(status === 'approved' ? 'User profile deleted' : 'Report dismissed', 'success');
       Router.render();
     } catch (err) {
       Utils.showToast(Utils.parseApiError(err), 'error');

@@ -343,7 +343,7 @@ const App = {
         { icon: Icons.book, label: 'Skills', path: '/admin/skills' },
         { icon: Icons.book, label: 'Courses', path: '/admin/courses' },
         { icon: Icons.shield, label: 'Reports', path: '/admin/reports' },
-        { icon: Icons.user, label: 'Moderation', path: '/admin/users' },
+        { icon: Icons.user, label: 'Users', path: '/admin/users' },
       ];
     }
 

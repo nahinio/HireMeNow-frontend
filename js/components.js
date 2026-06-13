@@ -794,7 +794,7 @@ const Components = {
       { path: '/admin/skills', label: 'Skills' },
       { path: '/admin/courses', label: 'Courses' },
       { path: '/admin/reports', label: 'Reports', badge: pending > 0 ? pending : null },
-      { path: '/admin/users', label: 'Moderation' },
+      { path: '/admin/users', label: 'Users' },
     ];
 
     const resolveActive = (path) => {
@@ -1171,7 +1171,7 @@ const Components = {
       </div>`;
   },
 
-  adminUsersTable(users, { withActions = true } = {}) {
+  adminUsersTable(users) {
     if (!users?.length) {
       return `<div class="admin-empty-panel">${Components.emptyState('No users found')}</div>`;
     }
@@ -1182,12 +1182,6 @@ const Components = {
           ? '<span class="badge badge-skill-inactive">Banned</span>'
           : '<span class="badge badge-skill-active">Active</span>';
       const roleLabel = u.role === 'client' ? 'Client' : 'Freelancer';
-      const actions = withActions && !u.is_deleted
-        ? `<div class="admin-row-actions">
-            ${!u.is_banned ? `<button type="button" class="btn btn-sm btn-ghost ban-admin-user" data-id="${u.id}" data-name="${Utils.escapeHtml(u.display_name)}">Ban</button>` : ''}
-            <button type="button" class="btn btn-sm btn-ghost-danger delete-admin-user" data-id="${u.id}" data-name="${Utils.escapeHtml(u.display_name)}" data-role="${Utils.escapeHtml(u.role)}">Delete</button>
-          </div>`
-        : '—';
       return `
         <tr>
           <td class="admin-td-title">
@@ -1197,7 +1191,6 @@ const Components = {
           <td><span class="badge">${Utils.escapeHtml(roleLabel)}</span></td>
           <td>${status}</td>
           <td class="admin-td-date">${Utils.formatDateShort(u.created_at)}</td>
-          <td class="admin-td-actions">${actions}</td>
         </tr>`;
     }).join('');
 
@@ -1210,7 +1203,6 @@ const Components = {
               <th>Role</th>
               <th>Status</th>
               <th>Joined</th>
-              <th aria-label="Actions"></th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -1233,8 +1225,8 @@ const Components = {
         <td class="admin-td-actions">
           ${withActions && r.status === 'pending' ? `
             <div class="admin-row-actions">
-              <button type="button" class="btn btn-sm btn-primary resolve-report" data-id="${r.id}" data-status="approved">Approve</button>
-              <button type="button" class="btn btn-sm btn-ghost resolve-report" data-id="${r.id}" data-status="rejected">Reject</button>
+              <button type="button" class="btn btn-sm btn-ghost-danger resolve-report" data-id="${r.id}" data-status="approved">Delete profile</button>
+              <button type="button" class="btn btn-sm btn-ghost resolve-report" data-id="${r.id}" data-status="rejected">Dismiss</button>
             </div>
           ` : '—'}
         </td>
@@ -1328,7 +1320,7 @@ const Components = {
         <h3>Quick links</h3>
         <div class="admin-rail-links">
           <a class="admin-rail-link" data-nav="/admin/jobs">Job listings</a>
-          <a class="admin-rail-link" data-nav="/admin/users">User moderation</a>
+          <a class="admin-rail-link" data-nav="/admin/users">All users</a>
           <a class="admin-rail-link" data-nav="/">Public site</a>
         </div>
       </div>`;
