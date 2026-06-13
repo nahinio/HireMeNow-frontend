@@ -428,6 +428,11 @@ Object.assign(Pages, {
       });
     } catch (err) {
       if (err?.handled) return false;
+      if (err?.status === 401) {
+        loadError = 'Session expired or not signed in. Log in again as admin.';
+        Auth.handleSessionExpired();
+        return false;
+      }
       loadError = Utils.parseApiError(err);
       data = { items: [], page: 1, limit: 50, total: 0 };
     }

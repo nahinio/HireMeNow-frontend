@@ -64,8 +64,12 @@ const Auth = {
 
   requireRole(roles) {
     const user = Auth.getUser();
+    const path = typeof Router !== 'undefined' ? Router.getPath() : '';
+    const adminRoute = path.startsWith('/admin') && path !== '/admin/login';
+    const loginPath = roles.includes('admin') || adminRoute ? '/admin/login' : '/login';
+
     if (!user || !Auth.getToken()) {
-      Router.navigate('/login');
+      Router.navigate(loginPath);
       return false;
     }
     if (!roles.includes(user.role)) {
