@@ -2,81 +2,45 @@ Object.assign(Pages, {
   async freelancerDashboard() {
     if (!Auth.requireRole(['freelancer'])) return '';
     const profile = await Api.get('/freelancer/profile');
-    const jobs = await Api.get('/jobs', { query: { limit: 5 } }).catch(() => ({ items: [] }));
-    const skills = await Api.get('/skills', { auth: false, query: { limit: 100 } }).catch(() => ({ items: [] }));
+    const [jobs, skills, publicProfile] = await Promise.all([
+      Api.get('/jobs', { query: { limit: 3 } }).catch(() => ({ items: [] })),
+      Api.get('/skills', { auth: false, query: { limit: 100 } }).catch(() => ({ items: [] })),
+      Api.get(`/freelancers/${profile.id}`, { auth: false }).catch(() => ({ skills: [] })),
+    ]);
     const quizCount = (skills.items || []).filter((s) => s.quiz).length;
-    const earnedSkills = (await Api.get(`/freelancers/${profile.id}`, { auth: false }).catch(() => ({ skills: [] }))).skills || [];
+    const earnedSkills = publicProfile.skills || [];
 
     return `
-      ${Components.pageHeader(`Hello, ${profile.display_name}`, profile.availability_status)}
-      <div class="dashboard-grid">
-        <div class="card stat-card">
-          <h3>Rating</h3>
-          <p class="stat">${Utils.stars(profile.avg_rating)}</p>
-          <small>${profile.review_count} reviews</small>
+      <div class="portal-console freelancer-dash">
+        ${Components.freelancerDashboardHero(profile, {
+          earnedSkills: earnedSkills.length,
+          quizCount,
+        })}
+        <div class="portal-console-body freelancer-dash-body">
+          ${Components.freelancerQuickActions([
+            { path: '/freelancer/profile', label: 'Edit profile', hint: 'Bio, links & resume' },
+            { path: '/freelancer/quizzes', label: 'Take quizzes', hint: 'Earn skill badges' },
+            { path: '/jobs', label: 'Browse jobs', hint: 'Find open roles' },
+            { path: '/messages', label: 'Messages', hint: 'Client conversations' },
+          ])}
+          ${Components.adminSecondaryPanel({
+            title: 'Open jobs',
+            linkHref: '/jobs',
+            linkLabel: 'Browse all →',
+            body: Components.jobGrid(jobs.items || [], {
+              showHeader: false,
+              emptyMessage: 'No open jobs',
+            }),
+          })}
         </div>
-        <div class="card stat-card">
-          <h3>Skill badges</h3>
-          <p class="stat">${earnedSkills.length}</p>
-          <a data-nav="/freelancer/quizzes">Take quizzes →</a>
-        </div>
-        <div class="card stat-card">
-          <h3>Available quizzes</h3>
-          <p class="stat">${quizCount}</p>
-        </div>
-      </div>
-      <div class="actions-bar">
-        <a class="btn btn-primary" data-nav="/freelancer/profile">Edit profile</a>
-        <a class="btn" data-nav="/jobs">Browse jobs</a>
-        <a class="btn" data-nav="/messages">Messages</a>
-      </div>
-      <section class="section">
-        <h2>Recommended open jobs</h2>
-        <div class="grid">${(jobs.items || []).map(Components.jobCard).join('') || Components.emptyState('No jobs')}</div>
-      </section>`;
+      </div>`;
   },
 
   async freelancerProfile() {
     if (!Auth.requireRole(['freelancer'])) return '';
-    const p = await Api.get('/freelancer/profile');
+    const p = await Api.get('/freelancer/profile', { cache: false });
 
-    return `
-      ${Components.pageHeader('My profile')}
-      <form class="form card" data-form="freelancerProfile">
-        ${Components.field('Display name', 'display_name', 'text', p.display_name)}
-        ${Components.field('Bio', 'bio', 'textarea', p.bio, 'rows="4"')}
-        ${Components.field('Contact email', 'contact_email', 'email', p.contact_email || '')}
-        ${Components.field('LinkedIn URL', 'linkedin_url', 'url', p.linkedin_url || '')}
-        ${Components.field('GitHub URL', 'github_url', 'url', p.github_url || '')}
-        ${Components.field('Portfolio URL', 'portfolio_url', 'url', p.portfolio_url || '')}
-        ${Components.field('Available for work', 'available_for_work', 'checkbox', p.availability_status === 'Available for Work')}
-        <button type="submit" class="btn btn-primary">Save profile</button>
-      </form>
-      <div class="card">
-        <h3>Profile picture</h3>
-        ${p.profile_picture_url ? `<img class="preview-img" src="${Utils.escapeHtml(Utils.resolveMediaUrl(p.profile_picture_url))}" alt="">` : ''}
-        <input type="file" id="profile-picture" accept="image/jpeg,image/png,image/webp">
-        <button class="btn btn-sm" id="upload-picture">Upload picture</button>
-      </div>
-      <div class="card">
-        <h3>Resume (PDF)</h3>
-        ${p.resume_url ? `<a href="${Utils.escapeHtml(Utils.resolveMediaUrl(p.resume_url))}" target="_blank">View resume</a>` : '<p>No resume uploaded</p>'}
-        <input type="file" id="profile-resume" accept="application/pdf">
-        <button class="btn btn-sm" id="upload-resume">Upload resume</button>
-      </div>
-      <div class="card">
-        <h3>Portfolio link</h3>
-        <form data-form="addPortfolio">
-          ${Components.field('Label', 'label', 'text', '', 'required')}
-          ${Components.field('URL', 'url', 'url', '', 'required')}
-          ${Components.field('Position', 'position', 'number', '1', 'min="1" required')}
-          <button type="submit" class="btn btn-sm">Add link</button>
-        </form>
-      </div>
-      <div class="card danger-zone">
-        <h3>Delete account</h3>
-        <button class="btn btn-danger" id="delete-freelancer-profile">Delete my profile</button>
-      </div>`;
+    return Components.freelancerProfilePage(p, p.portfolio_links || []);
   },
 
   async freelancerQuizzes() {
@@ -85,21 +49,14 @@ Object.assign(Pages, {
     const profile = await Api.get('/freelancer/profile');
     const publicProfile = await Api.get(`/freelancers/${profile.id}`, { auth: false }).catch(() => ({ skills: [] }));
     const earned = new Set((publicProfile.skills || []).map((s) => s.id));
-
     const quizzes = (data.items || []).filter((s) => s.quiz);
-    const list = quizzes.length
-      ? quizzes.map((s) => `
-          <div class="card quiz-card">
-            <h3>${Utils.escapeHtml(s.name)}</h3>
-            <p>${s.quiz.question_count} questions · Pass: ${s.quiz.pass_threshold}%</p>
-            ${earned.has(s.id) ? '<span class="badge badge-completed">Badge earned</span>' : ''}
-            <a class="btn btn-sm" data-nav="/freelancer/quizzes/${s.quiz.quiz_id}">Take quiz</a>
-          </div>`).join('')
-      : Components.emptyState('No published quizzes yet. Admin must create and publish a skill quiz.');
 
-    return `
-      ${Components.pageHeader('Skill quizzes', 'Earn badges to apply for jobs')}
-      <div class="grid">${list}</div>`;
+    return PortalPages.wrap('Skill quizzes', 'Earn badges to apply for jobs', `
+      ${Components.adminSecondaryPanel({
+        title: `Available quizzes (${quizzes.length})`,
+        body: PortalPages.quizListTable(quizzes, earned),
+      })}`,
+    );
   },
 
   async freelancerQuizTake({ id }) {
@@ -108,26 +65,36 @@ Object.assign(Pages, {
     try {
       quiz = await Api.get(`/quizzes/${id}`, { auth: false });
     } catch {
-      return `${Components.pageHeader('Quiz not found')}
-        <p>This quiz is unavailable or not published.</p>
-        <a class="btn" data-nav="/freelancer/quizzes">Back</a>`;
+      return PortalPages.wrap('Quiz not found', '', `
+        <div class="admin-empty-panel">${Components.emptyState('This quiz is unavailable or not published.')}</div>
+        <p class="form-footer"><a data-nav="/freelancer/quizzes">← Back to quizzes</a></p>`);
     }
 
     const questions = [...(quiz.questions || [])].sort((a, b) => a.position - b.position);
     const questionHtml = questions.map((q, i) => {
       const options = (q.options || []).map(
-        (o) => `<label class="radio"><input type="radio" name="q_${q.id}" value="${o.id}" required> ${Utils.escapeHtml(o.body)}</label>`
+        (o) => `<label class="radio portal-quiz-option"><input type="radio" name="q_${q.id}" value="${o.id}" required> ${Utils.escapeHtml(o.body)}</label>`
       ).join('');
-      return `<div class="card quiz-question"><h4>Q${i + 1}. ${Utils.escapeHtml(q.body)}</h4>${options}</div>`;
+      return `
+        <div class="portal-quiz-question">
+          <p class="portal-quiz-q-label">Question ${i + 1}</p>
+          <p class="portal-quiz-q-body">${Utils.escapeHtml(q.body)}</p>
+          <div class="portal-quiz-options">${options}</div>
+        </div>`;
     }).join('');
 
-    return `
-      ${Components.pageHeader(quiz.skill_name || 'Skill quiz')}
-      <form id="quiz-attempt-form" data-quiz-id="${id}">
-        ${questionHtml}
-        <button type="submit" class="btn btn-primary">Submit answers</button>
-      </form>
-      <div id="quiz-result" hidden class="card"></div>`;
+    return PortalPages.wrap(quiz.skill_name || 'Skill quiz', `${questions.length} questions`, `
+      ${Components.adminComposePanel({
+        label: 'Quiz',
+        title: quiz.skill_name || 'Verification quiz',
+        body: `
+          <form id="quiz-attempt-form" class="portal-quiz-form" data-form="quizAttempt" data-quiz-id="${id}">
+            ${questionHtml}
+            <p class="portal-quiz-submit-hint" id="quiz-submit-hint">Answer every question — your quiz submits automatically.</p>
+          </form>
+          <div id="quiz-result" hidden class="portal-quiz-result"></div>`,
+      })}`,
+    );
   },
 });
 
@@ -142,6 +109,8 @@ FormHandlers.freelancerProfile = async (form) => {
   try {
     await Api.patch('/freelancer/profile', payload);
     Utils.showToast('Profile updated', 'success');
+    await Auth.refreshUser();
+    Router.render();
   } catch (err) {
     Utils.showToast(Utils.parseApiError(err), 'error');
   }
@@ -157,34 +126,199 @@ FormHandlers.addPortfolio = async (form) => {
     });
     Utils.showToast('Portfolio link added', 'success');
     form.reset();
+    const nextPos = Number(form.dataset.nextPosition || 1) + 1;
+    form.dataset.nextPosition = String(nextPos);
+    const posInput = form.querySelector('input[name="position"]');
+    if (posInput) posInput.value = String(nextPos);
+    Router.render();
   } catch (err) {
     Utils.showToast(Utils.parseApiError(err), 'error');
   }
 };
 
+FormHandlers.editPortfolio = async (form) => {
+  const linkId = form.dataset.linkId;
+  const fd = new FormData(form);
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const defaultLabel = submitBtn?.textContent || 'Save link';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving…';
+  }
+  try {
+    await Api.patch(`/freelancer/portfolio/${linkId}`, {
+      label: fd.get('label'),
+      url: fd.get('url'),
+      position: Number(fd.get('position')),
+    });
+    Utils.showToast('Portfolio link updated', 'success');
+  } catch (err) {
+    Utils.showToast(Utils.parseApiError(err), 'error');
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = defaultLabel;
+    }
+  }
+};
+
+function updateFreelancerPhotoPreview(url) {
+  const busted = Utils.cacheBustMediaUrl(url);
+  const preview = document.getElementById('profile-photo-preview');
+  if (preview) {
+    preview.innerHTML = `<img src="${Utils.escapeHtml(busted)}" alt="">`;
+  }
+  document.querySelectorAll('.freelancer-profile-avatar-img').forEach((img) => {
+    img.src = busted;
+  });
+  const letter = document.querySelector('.freelancer-profile-avatar-letter');
+  if (letter) {
+    const avatar = letter.closest('.freelancer-profile-avatar');
+    if (avatar) {
+      avatar.innerHTML = `<img class="freelancer-profile-avatar-img" src="${Utils.escapeHtml(busted)}" alt="">`;
+    }
+  }
+}
+
+function updateFreelancerResumePreview(url) {
+  const preview = document.getElementById('profile-resume-preview');
+  if (!preview) return;
+  const href = Utils.resolveMediaUrl(url);
+  preview.innerHTML = `<a class="freelancer-profile-resume-link" href="${Utils.escapeHtml(href)}" target="_blank" rel="noopener noreferrer">View current resume</a>`;
+}
+
+FormHandlers.quizAttempt = async (form) => {
+  if (form.dataset.submitting === '1') return;
+
+  const quizId = form.dataset.quizId;
+  const questions = form.querySelectorAll('.portal-quiz-question');
+  const payload = [...questions].map((block) => {
+    const input = block.querySelector('input[type="radio"]:checked');
+    if (!input) return null;
+    return {
+      question_id: input.name.replace(/^q_/, ''),
+      selected_option_id: input.value,
+    };
+  }).filter(Boolean);
+
+  if (payload.length !== questions.length) {
+    Utils.showToast('Please answer every question.', 'error');
+    return;
+  }
+
+  form.dataset.submitting = '1';
+  form.classList.add('is-submitting');
+  const hint = document.getElementById('quiz-submit-hint');
+  if (hint) hint.textContent = 'Submitting your answers…';
+
+  try {
+    const result = await Api.post(`/quizzes/${quizId}/attempt`, payload);
+    const panel = form.closest('.admin-compose-panel');
+    const el = document.getElementById('quiz-result');
+    if (el) {
+      el.hidden = false;
+      if (result.result === 'pass') {
+        el.innerHTML = `
+          <h3>Passed — ${result.score}%</h3>
+          <p>Skill badge earned. You can now apply to jobs requiring this skill.</p>
+          <div class="portal-quiz-result-actions">
+            <a class="btn btn-primary" data-nav="/freelancer/dashboard">Back to dashboard</a>
+            <a class="btn btn-ghost" data-nav="/freelancer/quizzes">All quizzes</a>
+          </div>`;
+        el.className = 'portal-quiz-result alert-success';
+      } else {
+        el.innerHTML = `
+          <h3>Failed — ${result.score}%</h3>
+          <p>${(result.resources || []).join(' ')}</p>
+          ${Components.recommendedCoursesBlock(result.recommended_courses || [])}
+          <div class="portal-quiz-result-actions">
+            <button type="button" class="btn portal-quiz-retry-btn" onclick="location.reload()">Retry quiz</button>
+            <a class="btn btn-primary" data-nav="/freelancer/quizzes">All quizzes</a>
+            <a class="btn btn-ghost" data-nav="/freelancer/dashboard">Back to dashboard</a>
+          </div>`;
+        el.className = 'portal-quiz-result alert-error';
+      }
+      App.bindNavIn(el);
+    }
+    form.remove();
+    panel?.querySelector('.admin-compose-foot')?.remove();
+    panel?.querySelector('#quiz-submit-btn')?.remove();
+  } catch (err) {
+    form.dataset.submitting = '0';
+    form.classList.remove('is-submitting');
+    if (hint) hint.textContent = 'Answer every question — your quiz submits automatically.';
+    Utils.showToast(Utils.parseApiError(err), 'error');
+  }
+};
+
+async function uploadFreelancerProfileFile(input, { path, successMessage, refreshUser = false, onSuccess }) {
+  const file = input?.files?.[0];
+  if (!file) return;
+
+  const zone = input.closest('.freelancer-profile-upload');
+  const btn = zone?.querySelector('.freelancer-profile-upload-btn');
+  const defaultLabel = btn?.dataset.defaultLabel || btn?.textContent || 'Upload';
+  if (btn) {
+    btn.dataset.defaultLabel = defaultLabel;
+    btn.textContent = 'Uploading…';
+  }
+  zone?.classList.add('is-uploading');
+
+  try {
+    const result = await Api.upload(path, file);
+    if (typeof onSuccess === 'function') onSuccess(result?.url);
+    Utils.showToast(successMessage, 'success');
+    if (refreshUser) await Auth.refreshUser();
+    Api.invalidateCache('/freelancers');
+  } catch (err) {
+    Utils.showToast(Utils.parseApiError(err), 'error');
+  } finally {
+    if (btn) btn.textContent = defaultLabel;
+    zone?.classList.remove('is-uploading');
+    input.value = '';
+  }
+}
+
+document.addEventListener('change', async (e) => {
+  if (e.target.id === 'profile-picture') {
+    await uploadFreelancerProfileFile(e.target, {
+      path: '/freelancer/profile/picture',
+      successMessage: 'Photo uploaded',
+      refreshUser: true,
+      onSuccess: updateFreelancerPhotoPreview,
+    });
+    return;
+  }
+  if (e.target.id === 'profile-resume') {
+    await uploadFreelancerProfileFile(e.target, {
+      path: '/freelancer/profile/resume',
+      successMessage: 'Resume uploaded',
+      onSuccess: updateFreelancerResumePreview,
+    });
+  }
+});
+
 document.addEventListener('click', async (e) => {
-  if (e.target.id === 'upload-picture') {
-    const input = document.getElementById('profile-picture');
-    if (!input?.files?.[0]) return Utils.showToast('Choose an image first', 'error');
+  const deletePortfolioBtn = e.target.closest('[data-delete-portfolio]');
+  if (deletePortfolioBtn) {
+    const linkId = deletePortfolioBtn.dataset.deletePortfolio;
+    if (!linkId || !confirm('Remove this portfolio link?')) return;
+    deletePortfolioBtn.disabled = true;
     try {
-      await Api.upload('/freelancer/profile/picture', input.files[0]);
-      Utils.showToast('Picture uploaded', 'success');
-      Router.render();
+      await Api.delete(`/freelancer/portfolio/${linkId}`);
+      deletePortfolioBtn.closest('.freelancer-profile-portfolio-item')?.remove();
+      const list = document.getElementById('profile-portfolio-list');
+      if (list && !list.querySelector('.freelancer-profile-portfolio-item')) {
+        list.outerHTML = '<p class="freelancer-profile-empty" id="profile-portfolio-empty">No portfolio links yet.</p>';
+      }
+      Utils.showToast('Portfolio link removed', 'success');
     } catch (err) {
+      deletePortfolioBtn.disabled = false;
       Utils.showToast(Utils.parseApiError(err), 'error');
     }
+    return;
   }
-  if (e.target.id === 'upload-resume') {
-    const input = document.getElementById('profile-resume');
-    if (!input?.files?.[0]) return Utils.showToast('Choose a PDF first', 'error');
-    try {
-      await Api.upload('/freelancer/profile/resume', input.files[0]);
-      Utils.showToast('Resume uploaded', 'success');
-      Router.render();
-    } catch (err) {
-      Utils.showToast(Utils.parseApiError(err), 'error');
-    }
-  }
+
   if (e.target.id === 'delete-freelancer-profile') {
     if (!confirm('Delete your account? This cannot be undone.')) return;
     try {
@@ -195,41 +329,5 @@ document.addEventListener('click', async (e) => {
     } catch (err) {
       Utils.showToast(Utils.parseApiError(err), 'error');
     }
-  }
-});
-
-document.addEventListener('submit', async (e) => {
-  if (e.target.id !== 'quiz-attempt-form') return;
-  e.preventDefault();
-  const quizId = e.target.dataset.quizId;
-  const payload = [...e.target.querySelectorAll('.quiz-question')].map((block) => {
-    const input = block.querySelector('input[type="radio"]:checked');
-    if (!input) return null;
-    const questionId = input.name.replace(/^q_/, '');
-    return { question_id: questionId, selected_option_id: input.value };
-  }).filter(Boolean);
-
-  try {
-    const result = await Api.post(`/quizzes/${quizId}/attempt`, payload);
-    const el = document.getElementById('quiz-result');
-    if (el) {
-      el.hidden = false;
-      if (result.result === 'pass') {
-        el.innerHTML = `<h3>Passed! Score: ${result.score}%</h3><p>Skill badge earned.</p>`;
-        el.className = 'card alert-success';
-      } else {
-        const courses = (result.recommended_courses || []).map(
-          (c) => `<li><a href="${Utils.escapeHtml(c.link)}" target="_blank">${Utils.escapeHtml(c.name)}</a></li>`
-        ).join('');
-        el.innerHTML = `<h3>Failed — Score: ${result.score}%</h3>
-          <p>${(result.resources || []).join(' ')}</p>
-          ${courses ? `<ul>${courses}</ul>` : ''}
-          <button class="btn" onclick="location.reload()">Retry</button>`;
-        el.className = 'card alert-error';
-      }
-    }
-    e.target.hidden = true;
-  } catch (err) {
-    Utils.showToast(Utils.parseApiError(err), 'error');
   }
 });

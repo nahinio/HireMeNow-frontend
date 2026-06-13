@@ -1,4 +1,6 @@
 const Store = {
+  SKILLS_TTL_MS: 600000,
+
   getConversations() {
     return Utils.readJson(CONFIG.CONVERSATIONS_KEY, []);
   },
@@ -27,6 +29,11 @@ const Store = {
     );
   },
 
+  clearSkillsCache() {
+    localStorage.removeItem(CONFIG.SKILLS_CACHE_KEY);
+    localStorage.removeItem(CONFIG.SKILLS_CACHE_AT_KEY);
+  },
+
   cacheSkills(skills) {
     const existing = Utils.readJson(CONFIG.SKILLS_CACHE_KEY, []);
     const map = new Map(existing.map((s) => [s.id, s]));
@@ -34,6 +41,7 @@ const Store = {
       if (s && s.id) map.set(s.id, s);
     });
     Utils.writeJson(CONFIG.SKILLS_CACHE_KEY, [...map.values()]);
+    localStorage.setItem(CONFIG.SKILLS_CACHE_AT_KEY, String(Date.now()));
   },
 
   getCachedSkills() {
@@ -43,7 +51,7 @@ const Store = {
   async refreshSkillsCache() {
     const skills = new Map();
     try {
-      const data = await Api.get('/skills', { auth: false, query: { limit: 100 } });
+      const data = await Api.get('/skills', { auth: false, query: { limit: 100 }, cache: true });
       (data.items || []).forEach((s) => {
         skills.set(s.id, {
           id: s.id,
@@ -53,32 +61,38 @@ const Store = {
           quiz: s.quiz || null,
         });
       });
-    } catch { /* ignore */ }
+    } catch {
+      return Store.getCachedSkills();
+    }
 
-    try {
-      const courses = await Api.get('/courses', { auth: false, query: { limit: 100 } });
-      (courses.items || []).forEach((c) => {
-        if (c.skill_id && !skills.has(c.skill_id)) {
-          skills.set(c.skill_id, {
-            id: c.skill_id,
-            name: c.skill_name || 'Skill',
-            description: '',
-            is_active: true,
-          });
-        }
-      });
-    } catch { /* ignore */ }
+    const list = [...skills.values()].sort((a, b) => a.name.localeCompare(b.name));
+    if (list.length) {
+      Utils.writeJson(CONFIG.SKILLS_CACHE_KEY, list);
+      localStorage.setItem(CONFIG.SKILLS_CACHE_AT_KEY, String(Date.now()));
+    }
+    return list;
+  },
 
-    try {
-      const jobs = await Api.get('/jobs', { auth: false, query: { limit: 100 } });
-      (jobs.items || []).forEach((j) => {
-        (j.required_skills || []).forEach((s) => {
-          if (!skills.has(s.id)) skills.set(s.id, s);
-        });
-      });
-    } catch { /* ignore */ }
+  ensureSkillsCache(options = {}) {
+    const force = Boolean(options.force);
+    const cached = Store.getCachedSkills();
+    const cachedAt = Number(localStorage.getItem(CONFIG.SKILLS_CACHE_AT_KEY) || 0);
+    const fresh = cached.length && Date.now() - cachedAt < Store.SKILLS_TTL_MS;
+    if (!force && fresh) return Promise.resolve(cached);
+    return Store.refreshSkillsCache();
+  },
 
-    Store.cacheSkills([...skills.values()]);
-    return Store.getCachedSkills();
+  getAppliedJobIds() {
+    return new Set(Utils.readJson(CONFIG.APPLIED_JOBS_KEY, []));
+  },
+
+  markJobApplied(jobId) {
+    const ids = Store.getAppliedJobIds();
+    ids.add(String(jobId));
+    Utils.writeJson(CONFIG.APPLIED_JOBS_KEY, [...ids]);
+  },
+
+  hasAppliedToJob(jobId) {
+    return Store.getAppliedJobIds().has(String(jobId));
   },
 };

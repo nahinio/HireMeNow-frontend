@@ -2,112 +2,140 @@ Object.assign(Pages, {
   async clientDashboard() {
     if (!Auth.requireRole(['client'])) return '';
     const profile = await Api.get('/client/profile');
-    const jobs = await Api.get('/jobs/mine', { query: { limit: 5 } }).catch(() => ({ items: [] }));
+    const jobs = await Api.get('/jobs/mine', { query: { limit: 8 } }).catch(() => ({ items: [] }));
 
-    return `
-      ${Components.pageHeader(`Welcome, ${profile.company_name}`)}
-      <div class="dashboard-grid">
-        <div class="card stat-card">
-          <h3>Company rating</h3>
-          <p class="stat">${Utils.stars(profile.avg_rating)}</p>
-          <small>${profile.review_count} reviews</small>
+    return PortalPages.wrap(
+      profile.company_name,
+      'Company dashboard',
+      `
+        <div class="admin-kpi-grid portal-kpi-grid">
+          ${Components.adminKpiCard('Company rating', Utils.stars(profile.avg_rating), `${profile.review_count} reviews`)}
+          ${Components.adminKpiCard('Active jobs', jobs.total ?? jobs.items?.length ?? 0, 'Posted listings')}
         </div>
-        <div class="card stat-card">
-          <h3>Your jobs</h3>
-          <p class="stat">${jobs.total ?? jobs.items?.length ?? 0}</p>
-        </div>
-      </div>
-      <div class="actions-bar">
-        <a class="btn btn-primary" data-nav="/client/jobs/new">Post a job</a>
-        <a class="btn" data-nav="/client/jobs">Manage jobs</a>
-        <a class="btn" data-nav="/client/profile">Company profile</a>
-        <a class="btn" data-nav="/messages">Messages</a>
-      </div>
-      <section class="section">
-        <h2>Recent jobs</h2>
-        <div class="grid">${(jobs.items || []).map(Components.jobCard).join('') || Components.emptyState('No jobs posted yet')}</div>
-      </section>`;
+        ${PortalPages.quickActions([
+          { path: '/client/jobs/new', label: 'Post a job', hint: 'Create a new listing' },
+          { path: '/client/jobs', label: 'Manage jobs', hint: 'View applicants' },
+          { path: '/client/profile', label: 'Company profile', hint: 'Edit details & logo' },
+          { path: '/messages', label: 'Messages', hint: 'Talk to freelancers' },
+        ])}
+        ${Components.adminSecondaryPanel({
+          title: 'Recent jobs',
+          linkHref: '/client/jobs',
+          linkLabel: 'View all →',
+          body: PortalPages.clientJobsTable(jobs.items || []),
+        })}`,
+    );
   },
 
   async clientProfile() {
     if (!Auth.requireRole(['client'])) return '';
     const p = await Api.get('/client/profile');
 
-    return `
-      ${Components.pageHeader('Company profile')}
-      <form class="form card" data-form="clientProfile">
-        ${Components.field('Company name', 'company_name', 'text', p.company_name)}
-        ${Components.field('Bio', 'bio', 'textarea', p.bio, 'rows="4"')}
-        ${Components.field('Company website', 'company_link', 'url', p.company_link || '')}
-        <button type="submit" class="btn btn-primary">Save</button>
-      </form>
-      <div class="card">
-        <h3>Company logo</h3>
-        ${p.profile_picture_url ? `<img class="preview-img" src="${Utils.escapeHtml(Utils.resolveMediaUrl(p.profile_picture_url))}" alt="">` : ''}
-        <input type="file" id="client-picture" accept="image/jpeg,image/png,image/webp">
-        <button class="btn btn-sm" id="upload-client-picture">Upload</button>
-      </div>
-      <div class="card danger-zone">
-        <h3>Delete account</h3>
-        <button class="btn btn-danger" id="delete-client-profile">Delete company account</button>
-      </div>`;
+    return PortalPages.wrap('Company profile', '', `
+      ${Components.adminComposePanel({
+        label: 'Company details',
+        title: 'Edit profile',
+        body: `
+          <form class="admin-compose-form" data-form="clientProfile" id="client-profile-form">
+            ${Components.field('Company name', 'company_name', 'text', p.company_name)}
+            ${Components.field('Bio', 'bio', 'textarea', p.bio, 'rows="4"')}
+            ${Components.field('Website', 'company_link', 'url', p.company_link || '')}
+          </form>`,
+        footer: '<button type="submit" form="client-profile-form" class="btn btn-primary">Save changes</button>',
+      })}
+      ${Components.adminComposePanel({
+        label: 'Branding',
+        title: 'Company logo',
+        body: `
+          <div id="client-photo-preview">
+          ${p.profile_picture_url ? `<img class="preview-img portal-preview-img" src="${Utils.escapeHtml(Utils.resolveMediaUrl(p.profile_picture_url))}" alt="">` : '<p class="admin-form-hint">Upload a square logo for your company profile.</p>'}
+          </div>
+          <div class="admin-file-field">
+            <input type="file" id="client-picture" accept="image/jpeg,image/png,image/webp">
+          </div>`,
+        footer: '<button type="button" class="btn btn-ghost" id="upload-client-picture">Upload logo</button>',
+      })}
+      ${Components.adminComposePanel({
+        label: 'Danger zone',
+        title: 'Delete account',
+        className: 'portal-danger-panel',
+        body: '<p class="admin-form-hint">Permanently delete your company account and all associated jobs.</p>',
+        footer: '<button type="button" class="btn btn-danger" id="delete-client-profile">Delete company account</button>',
+      })}`,
+    );
   },
 
   async clientJobs() {
     if (!Auth.requireRole(['client'])) return '';
     const params = Utils.getQueryParams();
     const data = await Api.get('/jobs/mine', {
-      query: { page: params.page || 1, limit: 12, status: params.status || undefined },
+      query: { page: params.page || 1, limit: 20, status: params.status || undefined },
     });
 
-    return `
-      ${Components.pageHeader('My jobs')}
-      <div class="actions-bar">
-        <a class="btn btn-primary" data-nav="/client/jobs/new">Post new job</a>
-      </div>
-      <div class="grid">${(data.items || []).map((job) => {
-        const extra = `<a class="btn btn-sm" data-nav="/client/jobs/${job.id}/applicants">Applicants</a>`;
-        return Components.jobCard(job).replace('</article>', `${extra}</article>`);
-      }).join('') || Components.emptyState('No jobs')}</div>
-      ${Components.pagination(data.page, data.limit, data.total, '/client/jobs')}`;
+    return PortalPages.wrap('My jobs', '', `
+      ${Components.adminComposePanel({
+        label: 'New listing',
+        title: 'Post a job',
+        body: '<p class="admin-form-hint">Create a job listing and review ranked applicants.</p>',
+        footer: '<a class="btn btn-primary" data-nav="/client/jobs/new">Post new job</a>',
+      })}
+      ${Components.adminSecondaryPanel({
+        title: `All jobs (${data.total || 0})`,
+        body: `
+          ${PortalPages.clientJobsTable(data.items || [])}
+          ${Components.pagination(data.page, data.limit, data.total, '/client/jobs')}`,
+      })}`,
+    );
   },
 
   async clientJobNew() {
     if (!Auth.requireRole(['client'])) return '';
-    const skills = await Store.refreshSkillsCache();
+    const skills = await Store.ensureSkillsCache();
     const profile = await Api.get('/client/profile');
+    const company = Utils.escapeHtml(profile.company_name || 'Your company');
 
-    const skillCheckboxes = skills.length
-      ? skills.map((s) => `
-          <label class="checkbox">
-            <input type="checkbox" name="skill_ids" value="${s.id}">
-            ${Utils.escapeHtml(s.name)}
-          </label>`).join('')
-      : '<p class="hint">No skills cached yet. Admin must create skills first, or browse jobs/courses to populate.</p>';
+    return PortalPages.wrap(
+      'Post a job',
+      'List the role and choose which skills applicants must verify.',
+      `
+        <section class="job-post-card">
+          <form class="job-post-form" data-form="createJob" id="create-job-form">
+            <input type="hidden" name="company_name" value="${company}">
+            <p class="job-post-meta">Posting as <strong>${company}</strong></p>
 
-    return `
-      ${Components.pageHeader('Post a new job')}
-      <form class="form card" data-form="createJob">
-        ${Components.field('Job title', 'title', 'text', '', 'required')}
-        ${Components.field('Company name', 'company_name', 'text', profile.company_name, 'required')}
-        ${Components.field('About the role', 'about_role', 'textarea', '', 'required rows="3"')}
-        ${Components.field('Responsibilities', 'responsibilities', 'textarea', '', 'required rows="3"')}
-        ${Components.field('Salary amount', 'salary_amount', 'number', '', 'min="0"')}
-        ${Components.field('Salary negotiable', 'salary_negotiable', 'checkbox', false)}
-        ${Components.field('Requirements — education', 'requirements_education', 'textarea', '', 'rows="2"')}
-        ${Components.field('Requirements — experience', 'requirements_experience', 'textarea', '', 'rows="2"')}
-        ${Components.field('Requirements — additional', 'requirements_additional', 'textarea', '', 'rows="2"')}
-        ${Components.field('Other benefits', 'other_benefits', 'textarea', '', 'rows="2"')}
-        ${Components.field('Company description', 'company_description', 'textarea', '', 'rows="2"')}
-        <fieldset><legend>Required skills (min 1)</legend>${skillCheckboxes}</fieldset>
-        <div class="card">
-          <h3>Job thumbnail</h3>
-          <input type="file" id="job-thumbnail" accept="image/jpeg,image/png,image/webp">
-          <input type="hidden" name="thumbnail_url" id="thumbnail-url">
-          <p id="thumbnail-status" class="hint">Optional — upload before submitting</p>
-        </div>
-        <button type="submit" class="btn btn-primary">Publish job</button>
-      </form>`;
+            <div class="job-post-field">
+              <label for="job-title">Job title</label>
+              <input id="job-title" name="title" type="text" required
+                placeholder="e.g. Frontend developer" autocomplete="off">
+            </div>
+
+            <div class="job-post-field">
+              <span class="job-post-label">Required skills <span class="job-post-req">*</span></span>
+              ${Components.skillPicker(skills)}
+            </div>
+
+            <div class="job-post-field">
+              <label for="job-description">Description</label>
+              <textarea id="job-description" name="description" rows="5" required
+                placeholder="Briefly describe the role and what the freelancer will do."></textarea>
+            </div>
+
+            <details class="job-post-extra">
+              <summary>Cover image <span class="job-post-optional">optional</span></summary>
+              <div class="job-post-extra-body">
+                <input type="file" id="job-thumbnail" accept="image/jpeg,image/png,image/webp">
+                <input type="hidden" name="thumbnail_url" id="thumbnail-url">
+                <p id="thumbnail-status" class="job-post-hint">JPG, PNG or WebP · shown on the job listing</p>
+              </div>
+            </details>
+
+            <div class="job-post-actions">
+              <a class="btn btn-ghost" data-nav="/client/jobs">Cancel</a>
+              <button type="submit" class="btn btn-primary">Publish job</button>
+            </div>
+          </form>
+        </section>`,
+    );
   },
 
   async clientApplicants({ id }) {
@@ -115,33 +143,20 @@ Object.assign(Pages, {
     const job = await Api.get(`/jobs/${id}`);
     const data = await Api.get(`/jobs/${id}/applicants`);
 
-    const rows = (data.items || []).map((a) => `
-      <tr>
-        <td>${Utils.escapeHtml(a.profile.display_name)}</td>
-        <td>${Utils.escapeHtml(a.user.email)}</td>
-        <td>${Utils.stars(a.profile.avg_rating)}</td>
-        <td>${a.quiz_score_snapshot}%</td>
-        <td>${a.composite_score}</td>
-        <td>${Utils.statusBadge(a.status)}</td>
-        <td>
-          ${a.status === 'pending' && job.status === 'open'
-            ? `<button class="btn btn-sm select-applicant" data-app-id="${a.application_id}" data-job-id="${id}">Select</button>`
-            : '—'}
-        </td>
-      </tr>`).join('');
-
-    return `
-      ${Components.pageHeader('Applicants', job.title)}
-      ${Utils.statusBadge(job.status)}
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr><th>Name</th><th>Email</th><th>Rating</th><th>Quiz</th><th>Score</th><th>Status</th><th>Action</th></tr>
-          </thead>
-          <tbody>${rows || '<tr><td colspan="7">No applicants yet</td></tr>'}</tbody>
-        </table>
-      </div>
-      <a class="btn" data-nav="/client/jobs">Back to jobs</a>`;
+    return PortalPages.wrap('Applicants', job.title, `
+      ${Components.adminComposePanel({
+        label: 'Job status',
+        title: job.title,
+        body: `
+          <p class="admin-form-hint">${Utils.escapeHtml(job.company_name || '')}</p>
+          <div style="margin-top:0.5rem">${Utils.statusBadge(job.status)}</div>`,
+        footer: '<a class="btn btn-ghost" data-nav="/client/jobs">← Back to jobs</a>',
+      })}
+      ${Components.adminSecondaryPanel({
+        title: `Ranked applicants (${(data.items || []).length})`,
+        body: PortalPages.applicantsTable(data.items || [], { jobId: id, jobStatus: job.status }),
+      })}`,
+    );
   },
 });
 
@@ -154,6 +169,8 @@ FormHandlers.clientProfile = async (form) => {
       company_link: fd.get('company_link') || null,
     });
     Utils.showToast('Profile saved', 'success');
+    await Auth.refreshUser();
+    Router.render();
   } catch (err) {
     Utils.showToast(Utils.parseApiError(err), 'error');
   }
@@ -164,22 +181,17 @@ FormHandlers.createJob = async (form) => {
   const skillIds = [...form.querySelectorAll('input[name="skill_ids"]:checked')].map((el) => el.value);
   if (!skillIds.length) return Utils.showToast('Select at least one skill', 'error');
 
+  const description = (fd.get('description') || '').trim();
+  if (!description) return Utils.showToast('Add a short job description', 'error');
+
   const payload = {
-    title: fd.get('title'),
-    company_name: fd.get('company_name'),
-    about_role: fd.get('about_role'),
-    responsibilities: fd.get('responsibilities'),
-    salary_negotiable: fd.get('salary_negotiable') === 'on',
-    requirements_education: fd.get('requirements_education') || '',
-    requirements_experience: fd.get('requirements_experience') || '',
-    requirements_additional: fd.get('requirements_additional') || '',
-    other_benefits: fd.get('other_benefits') || '',
-    company_description: fd.get('company_description') || '',
+    title: (fd.get('title') || '').trim(),
+    description,
+    company_name: (fd.get('company_name') || '').trim(),
     required_skill_ids: skillIds,
+    salary_negotiable: true,
     thumbnail_url: fd.get('thumbnail_url') || null,
   };
-  const salary = fd.get('salary_amount');
-  if (salary) payload.salary_amount = Number(salary);
 
   try {
     const job = await Api.post('/jobs', payload);
@@ -207,9 +219,14 @@ document.addEventListener('click', async (e) => {
     const input = document.getElementById('client-picture');
     if (!input?.files?.[0]) return Utils.showToast('Choose an image', 'error');
     try {
-      await Api.upload('/client/profile/picture', input.files[0]);
+      const res = await Api.upload('/client/profile/picture', input.files[0]);
       Utils.showToast('Logo uploaded', 'success');
-      Router.render();
+      await Auth.refreshUser();
+      const preview = document.getElementById('client-photo-preview');
+      if (preview && res?.url) {
+        preview.innerHTML = `<img src="${Utils.escapeHtml(Utils.cacheBustMediaUrl(res.url))}" alt="">`;
+      }
+      input.value = '';
     } catch (err) {
       Utils.showToast(Utils.parseApiError(err), 'error');
     }
@@ -236,8 +253,7 @@ document.addEventListener('click', async (e) => {
         freelancer_id: res.conversation.freelancer_id,
         client_id: res.conversation.client_id,
       });
-      Utils.showToast('Applicant selected — share conversation ID with freelancer', 'success');
-      alert(`Conversation ID (share with freelancer):\n\n${res.conversation.id}`);
+      Utils.showToast('Applicant hired — conversation started with an automatic welcome message', 'success');
       Router.navigate(`/messages/${res.conversation.id}`);
     } catch (err) {
       Utils.showToast(Utils.parseApiError(err), 'error');

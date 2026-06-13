@@ -2,7 +2,7 @@ Object.assign(Pages, {
   login() {
     return `
       ${Components.pageHeader('Log in', 'Freelancers and clients')}
-      <form class="form card" data-form="login">
+      <form class="form" data-form="login">
         ${Components.field('Email', 'email', 'email', '', 'required autocomplete="email"')}
         ${Components.field('Password', 'password', 'password', '', 'required autocomplete="current-password"')}
         <button type="submit" class="btn btn-primary">Log in</button>
@@ -17,18 +17,18 @@ Object.assign(Pages, {
   adminLogin() {
     return `
       ${Components.pageHeader('Admin login')}
-      <form class="form card" data-form="adminLogin">
-        ${Components.field('Email', 'email', 'email', '', 'required')}
-        ${Components.field('Password', 'password', 'password', '', 'required')}
-        <button type="submit" class="btn btn-primary">Log in as admin</button>
-      </form>
-      <p class="form-footer"><a data-nav="/login">Back to user login</a></p>`;
+      <form class="form" data-form="adminLogin">
+          ${Components.field('Email', 'email', 'email', '', 'required')}
+          ${Components.field('Password', 'password', 'password', '', 'required')}
+          <button type="submit" class="btn btn-primary">Log in as admin</button>
+        </form>
+        <p class="form-footer"><a data-nav="/login">Back to user login</a></p>`;
   },
 
   register() {
     return `
       ${Components.pageHeader('Create account')}
-      <form class="form card" data-form="register">
+      <form class="form" data-form="register">
         ${Components.field('Email', 'email', 'email', '', 'required autocomplete="email"')}
         ${Components.field('Password', 'password', 'password', '', 'required minlength="8" autocomplete="new-password"')}
         ${Components.field('Role', 'role', 'select', `
@@ -48,7 +48,7 @@ Object.assign(Pages, {
   forgotPassword() {
     return `
       ${Components.pageHeader('Forgot password')}
-      <form class="form card" data-form="forgotPassword">
+      <form class="form" data-form="forgotPassword">
         ${Components.field('Email', 'email', 'email', '', 'required')}
         <button type="submit" class="btn btn-primary">Send reset link</button>
       </form>
@@ -64,7 +64,7 @@ Object.assign(Pages, {
     const { token } = Utils.getQueryParams();
     return `
       ${Components.pageHeader('Reset password')}
-      <form class="form card" data-form="resetPassword">
+      <form class="form" data-form="resetPassword">
         ${Components.field('Reset token', 'token', 'text', token || '', 'required')}
         ${Components.field('New password', 'new_password', 'password', '', 'required minlength="8"')}
         <button type="submit" class="btn btn-primary">Reset password</button>

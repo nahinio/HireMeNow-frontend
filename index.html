@@ -4,43 +4,61 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HireMeNow</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="assets/logo.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lato:wght@700;800;900&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css?v=60">
 </head>
 <body>
-  <header class="site-header">
-    <a class="logo" data-nav="/" href="#/">HireMeNow</a>
-    <nav class="nav-main">
-      <a data-nav="/jobs" href="#/jobs">Jobs</a>
-      <a data-nav="/freelancers" href="#/freelancers">Freelancers</a>
-      <a data-nav="/courses" href="#/courses">Courses</a>
-      <span id="nav-role" class="nav-role"></span>
-    </nav>
-    <div id="nav-auth" class="nav-auth"></div>
+  <header class="top-bar" id="top-bar">
+    <div class="top-bar-inner">
+      <a class="logo" id="site-logo" data-nav="/" href="#/" aria-label="HireMeNow home">
+        <img src="assets/logo.png" alt="" class="logo-img" height="36" decoding="async">
+        <span class="logo-name"><span class="logo-name-hire">Hire</span><span class="logo-name-accent">Me</span><span class="logo-name-now">Now</span></span>
+      </a>
+      <nav class="top-nav" id="top-nav" aria-label="Section navigation" hidden></nav>
+      <form class="search-bar" id="global-search" role="search">
+        <span class="icon" aria-hidden="true"></span>
+        <input type="search" name="q" placeholder="Search jobs" aria-label="Search jobs" autocomplete="off">
+      </form>
+      <div class="top-bar-actions" id="top-bar-actions"></div>
+    </div>
   </header>
 
-  <main id="main" class="main"></main>
+  <div class="app-shell" id="app-shell">
+    <aside class="sidebar-left" id="sidebar-left" aria-label="Main navigation"></aside>
 
-  <footer class="site-footer">
-    <p>HireMeNow — Freelancer marketplace</p>
-  </footer>
+    <div class="content-column">
+      <main id="main" class="main"></main>
+    </div>
+
+    <aside class="sidebar-right" id="sidebar-right" aria-label="Recommendations"></aside>
+  </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <script src="js/config.js"></script>
-  <script src="js/utils.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/store.js"></script>
-  <script src="js/components.js"></script>
-  <script src="js/router.js"></script>
-  <script src="js/pages/home.js"></script>
-  <script src="js/pages/auth.js"></script>
-  <script src="js/pages/jobs.js"></script>
-  <script src="js/pages/public.js"></script>
-  <script src="js/pages/freelancer.js"></script>
-  <script src="js/pages/client.js"></script>
-  <script src="js/pages/messages.js"></script>
-  <script src="js/pages/admin.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/config.js?v=41" defer></script>
+  <script src="js/icons.js?v=43" defer></script>
+  <script src="js/utils.js?v=50" defer></script>
+  <script src="js/api.js?v=42" defer></script>
+  <script src="js/auth.js?v=42" defer></script>
+  <script src="js/store.js?v=41" defer></script>
+  <script src="js/components.js?v=53" defer></script>
+  <script src="js/dropdowns.js?v=45" defer></script>
+  <script src="js/filters.js?v=45" defer></script>
+  <script src="js/portal.js?v=40" defer></script>
+  <script src="js/skill-quiz-builder.js?v=40" defer></script>
+  <script src="js/router.js?v=46" defer></script>
+  <script src="js/pages/home.js?v=43" defer></script>
+  <script src="js/pages/auth.js?v=40" defer></script>
+  <script src="js/pages/jobs.js?v=48" defer></script>
+  <script src="js/pages/public.js?v=47" defer></script>
+  <script src="js/pages/freelancer.js?v=47" defer></script>
+  <script src="js/pages/client.js?v=43" defer></script>
+  <script src="js/realtime.js?v=41" defer></script>
+  <script src="js/pages/messages.js?v=41" defer></script>
+  <script src="js/pages/admin.js?v=40" defer></script>
+  <script src="js/app.js?v=47" defer></script>
 </body>
 </html>

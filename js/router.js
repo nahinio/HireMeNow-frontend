@@ -1,8 +1,10 @@
 const Router = {
   routes: {},
+  shells: {},
 
-  register(path, handler) {
+  register(path, handler, shell) {
     Router.routes[path] = handler;
+    if (shell) Router.shells[path] = shell;
   },
 
   getPath() {
@@ -15,12 +17,29 @@ const Router = {
     location.hash = path.startsWith('#') ? path.slice(1) : path;
   },
 
+  resolveShell(path) {
+    if (Router.shells[path]) return Router.shells[path]();
+    for (const [pattern, shell] of Object.entries(Router.shells)) {
+      if (!pattern.includes(':')) continue;
+      const regex = new RegExp('^' + pattern.replace(/:[^/]+/g, '([^/]+)') + '$');
+      if (regex.test(path)) return shell();
+    }
+    return null;
+  },
+
   async render() {
     const path = Router.getPath();
     const main = document.getElementById('main');
     if (!main) return;
 
-    main.innerHTML = '<div class="loading">Loading…</div>';
+    const shellHtml = Router.resolveShell(path);
+    if (shellHtml != null) {
+      main.innerHTML = shellHtml;
+      Router.bindEvents(main);
+      App.bindNavIn(main);
+    } else {
+      main.innerHTML = '<div class="page-skeleton"><div class="skeleton-line skeleton-title"></div><div class="skeleton-line"></div></div>';
+    }
 
     const handler = Router.match(path);
     if (!handler) {
@@ -30,10 +49,24 @@ const Router = {
 
     try {
       const html = await handler();
+      if (html === false || html == null) {
+        Router.afterRender(path);
+        return;
+      }
       main.innerHTML = html;
       Router.bindEvents(main);
+      App.bindNavIn(main);
+      Router.afterRender(path);
     } catch (err) {
+      if (err?.handled) return;
       main.innerHTML = `<div class="alert alert-error">${Utils.escapeHtml(Utils.parseApiError(err))}</div>`;
+    }
+  },
+
+  afterRender(path) {
+    Dropdowns.enhance(document.getElementById('main'));
+    if (path === '/admin/skills' || /^\/admin\/skills\/[^/]+\/edit$/.test(path)) {
+      AdminSkills.initPage();
     }
   },
 
@@ -69,6 +102,21 @@ const Router = {
         const name = form.getAttribute('data-form');
         const handler = FormHandlers[name];
         if (handler) await handler(form);
+      });
+    });
+
+    root.querySelectorAll('form[data-form="quizAttempt"]').forEach((form) => {
+      if (form.dataset.autoSubmitBound) return;
+      form.dataset.autoSubmitBound = '1';
+      form.addEventListener('change', (e) => {
+        if (!e.target.matches('input[type="radio"]')) return;
+        const questions = form.querySelectorAll('.portal-quiz-question');
+        const allAnswered = [...questions].every(
+          (block) => block.querySelector('input[type="radio"]:checked'),
+        );
+        if (!allAnswered) return;
+        const handler = FormHandlers.quizAttempt;
+        if (handler) handler(form);
       });
     });
   },

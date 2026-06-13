@@ -1,116 +1,209 @@
 Object.assign(Pages, {
+  jobsShell() {
+    const params = Utils.getQueryParams();
+    const q = params.q || '';
+    const skill_id = params.skill_id || '';
+    const skills = Store.getCachedSkills();
+    const skillOptions = skills.map(
+      (s) => `<option value="${s.id}" ${s.id === skill_id ? 'selected' : ''}>${Utils.escapeHtml(s.name)}</option>`
+    ).join('');
+
+    const sort = params.sort || 'updated';
+    const chips = [];
+    const clearParams = { sort: sort !== 'updated' ? sort : undefined };
+    const keepParams = clearParams;
+
+    if (q) {
+      chips.push({
+        label: q,
+        params: { skill_id: skill_id || undefined, sort: keepParams.sort },
+      });
+    }
+    if (skill_id) {
+      const skill = skills.find((s) => s.id === skill_id);
+      chips.push({
+        label: skill?.name || 'Skill',
+        params: { q: q || undefined, sort: keepParams.sort },
+      });
+    }
+
+    return PortalPages.wrap('Jobs', 'Find your next role', `
+      ${Components.filterBar(
+        Components.filterToolbar({
+          id: 'job-filters',
+          path: '/jobs',
+          search: { name: 'q', placeholder: 'Search title…', value: q },
+          selects: [
+            {
+              name: 'skill_id',
+              label: 'Skill',
+              value: skill_id,
+              options: `<option value="">All skills</option>${skillOptions}`,
+            },
+          ],
+          chips,
+          clearParams,
+          keepParams,
+        }),
+        Components.filterCountBadge('Loading…', 'jobs-count-meta'),
+      )}
+      <div id="jobs-grid-slot" class="portal-job-grid">${Components.jobGridSkeleton(6)}</div>
+      <div id="jobs-pagination-slot"></div>`);
+  },
+
   async jobs() {
     const params = Utils.getQueryParams();
     const page = Number(params.page) || 1;
     const q = params.q || '';
     const skill_id = params.skill_id || '';
-    const skills = await Store.refreshSkillsCache();
+    const sort = params.sort || 'updated';
+    const slot = document.getElementById('jobs-grid-slot');
 
-    const skillOptions = skills.map(
-      (s) => `<option value="${s.id}" ${s.id === skill_id ? 'selected' : ''}>${Utils.escapeHtml(s.name)}</option>`
-    ).join('');
-
-    const data = await Api.get('/jobs', {
-      auth: false,
-      query: { page, limit: 12, q: q || undefined, skill_id: skill_id || undefined },
+    Store.ensureSkillsCache().then(() => {
+      const select = document.querySelector('#job-filters select[name="skill_id"]');
+      if (!select || select.options.length > 1) return;
+      const skills = Store.getCachedSkills();
+      skills.forEach((s) => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.name;
+        if (s.id === skill_id) opt.selected = true;
+        select.appendChild(opt);
+      });
+      Dropdowns.refresh(select);
     });
-    (data.items || []).forEach((j) => Store.cacheSkills(j.required_skills || []));
 
-    return `
-      ${Components.pageHeader('Browse jobs')}
-      <form class="filters card" id="job-filters">
-        <input type="search" name="q" placeholder="Search title…" value="${Utils.escapeHtml(q)}">
-        <select name="skill_id">
-          <option value="">All skills</option>
-          ${skillOptions}
-        </select>
-        <button type="submit" class="btn">Filter</button>
-      </form>
-      <div class="grid">${(data.items || []).length
-        ? data.items.map(Components.jobCard).join('')
-        : Components.emptyState('No jobs match your filters')}</div>
-      ${Components.pagination(data.page, data.limit, data.total, '/jobs')}`;
+    if (!slot) return Pages.jobsShell();
+
+    try {
+      const data = await Api.get('/jobs', {
+        auth: false,
+        query: { page, limit: 12, q: q || undefined, skill_id: skill_id || undefined },
+      });
+      (data.items || []).forEach((j) => Store.cacheSkills(j.required_skills || []));
+
+      let items = data.items || [];
+      if (sort === 'title') {
+        items = [...items].sort((a, b) => a.title.localeCompare(b.title));
+      }
+
+      slot.innerHTML = Components.jobGrid(items, {
+        sort,
+        emptyMessage: 'No jobs match your filters',
+        showHeader: false,
+      });
+      App.bindNavIn(slot);
+
+      const countMeta = document.getElementById('jobs-count-meta');
+      if (countMeta) countMeta.textContent = `${data.total || items.length} jobs`;
+
+      const pagSlot = document.getElementById('jobs-pagination-slot');
+      if (pagSlot) {
+        pagSlot.innerHTML = Components.pagination(
+          data.page,
+          data.limit,
+          data.total,
+          '/jobs',
+          { q: q || undefined, skill_id: skill_id || undefined, sort: sort !== 'updated' ? sort : undefined },
+        );
+        App.bindNavIn(pagSlot);
+      }
+    } catch {
+      slot.innerHTML = Components.emptyState('Could not load jobs');
+    }
+    return false;
   },
 
   async jobDetail({ id }) {
-    const job = await Api.get(`/jobs/${id}`, { auth: Auth.isLoggedIn() });
+    const user = Auth.getUser();
+    const job = await Api.get(`/jobs/${id}`, {
+      auth: Boolean(user && Auth.getToken()),
+      cache: false,
+    });
     Store.cacheSkills(job.required_skills || []);
 
-    const user = Auth.getUser();
     let actions = '';
+    const hasApplied = Boolean(job.viewer_has_applied || Store.hasAppliedToJob(job.id));
 
     if (user?.role === 'freelancer' && job.status === 'open') {
-      actions += `<button class="btn btn-primary" id="apply-job" data-job-id="${job.id}">Apply to this job</button>`;
+      if (hasApplied) {
+        actions += `<button type="button" class="btn btn-primary btn-block is-applied" disabled>Applied</button>`;
+      } else {
+        actions += `<button type="button" class="btn btn-primary btn-block" id="apply-job" data-job-id="${job.id}">Apply to this job</button>`;
+      }
     }
     if (user?.role === 'client' && user.id === job.client_id) {
-      actions += `<a class="btn" data-nav="/client/jobs/${job.id}/applicants">View applicants</a>`;
+      actions += `<a class="btn btn-block" data-nav="/client/jobs/${job.id}/applicants">View applicants</a>`;
     }
     if (user && (user.id === job.client_id || job.status !== 'open')) {
       if (['filled', 'pending_confirmation'].includes(job.status)) {
-        actions += `<button class="btn" id="complete-job" data-job-id="${job.id}">Signal job complete</button>`;
+        actions += `<button class="btn btn-block" id="complete-job" data-job-id="${job.id}">Signal job complete</button>`;
       }
       if (job.status === 'pending_confirmation') {
-        actions += `<a class="btn btn-primary" data-nav="/jobs/${job.id}/review">Submit review</a>`;
+        actions += `<a class="btn btn-primary btn-block" data-nav="/jobs/${job.id}/review">Submit review</a>`;
       }
-      actions += `<a class="btn" data-nav="/messages?job_id=${job.id}">Messages</a>`;
+      actions += `<a class="btn btn-block" data-nav="/messages">Messages</a>`;
     }
 
-    const thumb = job.thumbnail_url
-      ? `<img class="job-hero-img" src="${Utils.escapeHtml(Utils.resolveMediaUrl(job.thumbnail_url))}" alt="">`
-      : '';
-
-    const skills = (job.required_skills || [])
-      .map((s) => `<span class="tag">${Utils.escapeHtml(s.name)}</span>`).join('');
-
-    return `
-      ${Components.pageHeader(job.title, job.company_name)}
-      ${thumb}
-      <div class="detail-meta">
-        ${Utils.statusBadge(job.status)}
-        <span>${Utils.formatMoney(job.salary_amount, job.salary_negotiable)}</span>
-        <span>Posted ${Utils.formatDate(job.posted_at)}</span>
-      </div>
-      <div class="tags">${skills}</div>
-      <div class="actions-bar">${actions}</div>
-      <div class="detail-sections">
-        <section><h3>About the role</h3><p>${Utils.escapeHtml(job.about_role || job.description)}</p></section>
-        <section><h3>Responsibilities</h3><p>${Utils.escapeHtml(job.responsibilities)}</p></section>
-        <section><h3>Requirements</h3>
-          <p><strong>Education:</strong> ${Utils.escapeHtml(job.requirements_education)}</p>
-          <p><strong>Experience:</strong> ${Utils.escapeHtml(job.requirements_experience)}</p>
-          <p><strong>Additional:</strong> ${Utils.escapeHtml(job.requirements_additional)}</p>
-        </section>
-        ${job.other_benefits ? `<section><h3>Benefits</h3><p>${Utils.escapeHtml(job.other_benefits)}</p></section>` : ''}
-        ${job.company_description ? `<section><h3>About company</h3><p>${Utils.escapeHtml(job.company_description)}</p></section>` : ''}
-      </div>`;
+    return `<div class="portal-console"><div class="portal-console-body">${Components.jobDetailPage(job, actions)}</div></div>`;
   },
 
   async jobReview({ id }) {
     if (!Auth.requireRole(['freelancer', 'client'])) return '';
     const job = await Api.get(`/jobs/${id}`);
 
-    return `
-      ${Components.pageHeader('Submit review', job.title)}
-      <form class="form card" data-form="submitReview" data-job-id="${id}">
-        ${Components.field('Rating (1-5)', 'rating', 'number', '5', 'min="1" max="5" required')}
-        ${Components.field('Review (min 20 characters)', 'body', 'textarea', '', 'minlength="20" required rows="5"')}
-        <button type="submit" class="btn btn-primary">Submit review</button>
-      </form>
-      <p class="hint">Reviews publish when both parties submit. Job completes after both reviews.</p>`;
+    return PortalPages.wrap('Submit review', job.title, `
+      ${PortalPages.contentPanel(`
+        <form class="admin-compose-form" data-form="submitReview" data-job-id="${id}" id="submit-review-form">
+          ${Components.field('Rating (1-5)', 'rating', 'number', '5', 'min="1" max="5" required')}
+          ${Components.field('Review (min 20 characters)', 'body', 'textarea', '', 'minlength="20" required rows="5"')}
+          <p class="admin-form-hint">Reviews publish when both parties submit.</p>
+        </form>`, { footer: '<button type="submit" form="submit-review-form" class="btn btn-primary">Submit review</button>' })}`);
   },
 });
 
+function setJobApplyButtonApplied(btn, jobId) {
+  btn.disabled = true;
+  btn.removeAttribute('id');
+  btn.removeAttribute('data-job-id');
+  btn.textContent = 'Applied';
+  btn.classList.remove('is-applying');
+  btn.classList.add('is-applied');
+  if (jobId) Store.markJobApplied(jobId);
+}
+
 document.addEventListener('click', async (e) => {
-  if (e.target.id === 'apply-job') {
-    const jobId = e.target.dataset.jobId;
+  const applyBtn = e.target.closest('#apply-job');
+  if (applyBtn) {
+    const jobId = applyBtn.dataset.jobId;
+    const originalText = applyBtn.textContent;
+    applyBtn.disabled = true;
+    applyBtn.textContent = 'Applying…';
+    applyBtn.classList.add('is-applying');
+
     try {
       await Api.post(`/jobs/${jobId}/apply`);
+      setJobApplyButtonApplied(applyBtn, jobId);
       Utils.showToast('Application submitted!', 'success');
-      Router.render();
     } catch (err) {
-      Utils.showToast(Utils.parseApiError(err), 'error');
+      if (err?.status === 409) {
+        setJobApplyButtonApplied(applyBtn, jobId);
+        Utils.showToast('You already applied to this job', 'success');
+        return;
+      }
+      applyBtn.disabled = false;
+      applyBtn.textContent = originalText;
+      applyBtn.classList.remove('is-applying');
+      const missing = Utils.getMissingSkillBadges(err);
+      if (missing?.length) {
+        Utils.showSkillBadgeModal(missing);
+      } else {
+        Utils.showToast(Utils.parseApiError(err), 'error');
+      }
     }
+    return;
   }
+
   if (e.target.id === 'complete-job') {
     const jobId = e.target.dataset.jobId;
     try {
@@ -123,15 +216,19 @@ document.addEventListener('click', async (e) => {
   }
 });
 
-document.addEventListener('submit', (e) => {
-  if (e.target.id === 'job-filters') {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    Router.navigate(Utils.buildHash('/jobs', {
-      q: fd.get('q') || undefined,
-      skill_id: fd.get('skill_id') || undefined,
-    }).slice(1));
-  }
+
+document.addEventListener('click', (e) => {
+  const sortBtn = e.target.closest('.job-grid-sort-btn');
+  if (!sortBtn || Router.getPath() !== '/jobs') return;
+  e.preventDefault();
+  const params = Utils.getQueryParams();
+  const next = (params.sort || 'updated') === 'updated' ? 'title' : 'updated';
+  Router.navigate(Utils.buildHash('/jobs', {
+    q: params.q || undefined,
+    skill_id: params.skill_id || undefined,
+    page: params.page || undefined,
+    sort: next,
+  }).slice(1));
 });
 
 FormHandlers.submitReview = async (form) => {

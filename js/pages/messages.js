@@ -1,10 +1,67 @@
 const Messages = {
-  pollTimer: null,
+  activeChatId: null,
+  unsubscribers: [],
 
-  stopPolling() {
-    if (Messages.pollTimer) {
-      clearInterval(Messages.pollTimer);
-      Messages.pollTimer = null;
+  clearBindings() {
+    Messages.unsubscribers.forEach((off) => off());
+    Messages.unsubscribers = [];
+    Messages.activeChatId = null;
+  },
+
+  bindChat(conversationId, renderMessage) {
+    Messages.clearBindings();
+    Messages.activeChatId = conversationId;
+
+    const onNew = (data) => {
+      if (data.conversation_id !== conversationId || !data.message) return;
+      renderMessage(data.message);
+    };
+    const onRead = (data) => {
+      if (data.conversation_id !== conversationId) return;
+      const ids = new Set(data.message_ids || []);
+      document.querySelectorAll('[data-message-id]').forEach((el) => {
+        if (ids.has(el.dataset.messageId)) {
+          const small = el.querySelector('small');
+          if (small && !small.textContent.includes('read')) {
+            small.textContent += ' · read';
+          }
+        }
+      });
+    };
+
+    Messages.unsubscribers.push(Realtime.on('message.new', onNew));
+    Messages.unsubscribers.push(Realtime.on('messages.read', onRead));
+  },
+
+  renderMessageHtml(message, user) {
+    const mine = message.sender_id === user.id;
+    const system = message.is_system;
+    const cls = system ? 'system' : (mine ? 'mine' : 'theirs');
+    const label = system ? 'System' : '';
+    return `<div class="message ${cls}" data-message-id="${message.id}">
+      ${label ? `<span class="message-label">${Utils.escapeHtml(label)}</span>` : ''}
+      <p>${Utils.escapeHtml(message.body)}</p>
+      <small>${Utils.formatDate(message.sent_at)}${message.is_read ? ' · read' : ''}</small>
+    </div>`;
+  },
+
+  appendMessage(message, user) {
+    const box = document.getElementById('message-list');
+    if (!box) return;
+    const existing = box.querySelector(`[data-message-id="${message.id}"]`);
+    if (existing) return;
+    box.insertAdjacentHTML('beforeend', Messages.renderMessageHtml(message, user));
+    box.scrollTop = box.scrollHeight;
+  },
+
+  async syncConversations() {
+    try {
+      const items = await Api.get('/conversations');
+      items.forEach((c) => Store.saveConversation(c, { job_title: c.job_title }));
+      return items;
+    } catch (err) {
+      if (!err?.handled) Utils.showToast(Utils.parseApiError(err), 'error');
+      return Store.getConversations();
     }
   },
 };
@@ -12,126 +69,111 @@ const Messages = {
 Object.assign(Pages, {
   async messagesList() {
     if (!Auth.requireRole(['freelancer', 'client'])) return '';
-    Messages.stopPolling();
-    const convos = Store.getConversations();
+    Messages.clearBindings();
+    Realtime.connect();
+
+    const convos = await Messages.syncConversations();
 
     const list = convos.length
       ? convos.map((c) => `
-          <a class="card conversation-card" data-nav="/messages/${c.id}">
-            <h3>${Utils.escapeHtml(c.job_title || 'Job conversation')}</h3>
-            <p class="meta">Phase: ${Utils.escapeHtml(c.phase)} · Job ${Utils.escapeHtml(c.job_id?.slice(0, 8) || '')}…</p>
+          <a class="portal-convo-card" data-nav="/messages/${c.id}">
+            <span class="admin-entity-name">${Utils.escapeHtml(c.job_title || 'Job conversation')}</span>
+            <span class="admin-td-sub">Phase: ${Utils.escapeHtml(c.phase)}</span>
           </a>`).join('')
-      : Components.emptyState('No conversations yet. They are created when a client selects you as an applicant.');
+      : Components.emptyState('No conversations yet. A chat opens automatically when a client hires you for a job.');
 
-    return `
-      ${Components.pageHeader('Messages')}
-      <p class="hint">Conversations are stored locally. Clients get them automatically when selecting an applicant. Freelancers can paste a conversation ID shared by the client.</p>
-      <form class="form card inline-form" id="add-conversation-form">
-        ${Components.field('Conversation ID', 'conv_id', 'text', '', 'placeholder="UUID" required')}
-        ${Components.field('Job title (optional)', 'job_title', 'text', '')}
-        <button type="submit" class="btn btn-sm">Add conversation</button>
-      </form>
-      <div class="conversation-list">${list}</div>`;
+    return PortalPages.wrap('Messages', 'Client ↔ freelancer conversations', `
+      ${Components.adminSecondaryPanel({
+        title: `Conversations (${convos.length})`,
+        body: `<div class="portal-convo-list">${list}</div>`,
+      })}`);
   },
 
   async messagesChat({ id }) {
     if (!Auth.requireRole(['freelancer', 'client'])) return '';
-    const convos = Store.getConversations();
-    const meta = convos.find((c) => c.id === id) || { id };
+    Messages.clearBindings();
+    Realtime.connect();
+
     const user = Auth.getUser();
+    let meta;
+    try {
+      meta = await Api.get(`/conversations/${id}`);
+      Store.saveConversation(meta, { job_title: meta.job_title });
+    } catch (err) {
+      if (err?.handled) return false;
+      return PortalPages.wrap('Conversation', '', `
+        <div class="alert alert-error">${Utils.escapeHtml(Utils.parseApiError(err))}</div>
+        <p class="form-footer"><a data-nav="/messages">← Back to messages</a></p>`);
+    }
 
     let messages = [];
     try {
       messages = await Api.get(`/conversations/${id}/messages`);
     } catch (err) {
-      return `${Components.pageHeader('Conversation')}
+      if (err?.handled) return false;
+      return PortalPages.wrap('Conversation', '', `
         <div class="alert alert-error">${Utils.escapeHtml(Utils.parseApiError(err))}</div>
-        <a class="btn" data-nav="/messages">Back</a>`;
+        <p class="form-footer"><a data-nav="/messages">← Back to messages</a></p>`);
     }
 
-    const renderMessages = (msgs) => msgs.map((m) => {
-      const mine = m.sender_id === user.id;
-      return `<div class="message ${mine ? 'mine' : 'theirs'}">
-        <p>${Utils.escapeHtml(m.body)}</p>
-        <small>${Utils.formatDate(m.sent_at)}${m.is_read ? ' · read' : ''}</small>
-      </div>`;
-    }).join('');
+    const renderMessages = (msgs) => msgs.map((m) => Messages.renderMessageHtml(m, user)).join('');
 
-    Messages.stopPolling();
-    Messages.pollTimer = setInterval(async () => {
-      try {
-        const msgs = await Api.get(`/conversations/${id}/messages`);
-        const box = document.getElementById('message-list');
-        if (box) box.innerHTML = renderMessages(msgs);
-      } catch { /* ignore poll errors */ }
-    }, CONFIG.MESSAGE_POLL_MS);
+    Messages.bindChat(id, (message) => Messages.appendMessage(message, user));
 
     const locked = meta.phase === 'is_locked';
+    const reportBtn = user.role === 'client' && meta.freelancer_id
+      ? `<button type="button" class="btn btn-ghost-danger btn-sm" id="report-freelancer" data-user-id="${meta.freelancer_id}">Report freelancer</button>`
+      : user.role === 'freelancer' && meta.client_id
+        ? `<button type="button" class="btn btn-ghost-danger btn-sm" id="report-client" data-user-id="${meta.client_id}">Report client</button>`
+        : '';
 
-    return `
-      ${Components.pageHeader('Chat', meta.job_title || `Conversation ${id.slice(0, 8)}…`)}
-      <a class="btn btn-sm" data-nav="/messages">← All messages</a>
-      ${locked ? '<p class="alert">This conversation is locked.</p>' : ''}
-      <div id="message-list" class="message-list">${renderMessages(messages)}</div>
-      ${locked ? '' : `
-        <form class="message-compose" data-form="sendMessage" data-conversation-id="${id}">
-          ${Components.field('Message', 'body', 'textarea', '', 'required rows="2"')}
-          <button type="submit" class="btn btn-primary">Send</button>
-        </form>`}
-      ${user.role === 'client' && meta.freelancer_id ? `
-        <button class="btn btn-danger btn-sm" id="report-freelancer" data-user-id="${meta.freelancer_id}">Report freelancer</button>` : ''}
-      ${user.role === 'freelancer' && meta.client_id ? `
-        <button class="btn btn-danger btn-sm" id="report-client" data-user-id="${meta.client_id}">Report client</button>` : ''}`;
+    requestAnimationFrame(() => {
+      const box = document.getElementById('message-list');
+      if (box) box.scrollTop = box.scrollHeight;
+    });
+
+    return PortalPages.wrap(meta.job_title || 'Chat', `Conversation ${id.slice(0, 8)}…`, `
+      ${PortalPages.contentPanel(`
+        ${locked ? '<p class="alert">This conversation is locked.</p>' : ''}
+        <div id="message-list" class="message-list portal-message-list">${renderMessages(messages)}</div>
+        ${locked ? '' : `
+          <form class="admin-compose-form portal-message-compose" data-form="sendMessage" data-conversation-id="${id}" id="send-message-form">
+            ${Components.field('Message', 'body', 'textarea', '', 'required rows="2"')}
+          </form>`}`, {
+        footer: locked
+          ? `<a class="btn btn-ghost" data-nav="/messages">← All messages</a>${reportBtn}`
+          : `<a class="btn btn-ghost" data-nav="/messages">← All messages</a>${reportBtn}<button type="submit" form="send-message-form" class="btn btn-primary">Send</button>`,
+      })}`);
   },
 });
 
 FormHandlers.sendMessage = async (form) => {
   const id = form.dataset.conversationId;
   const fd = new FormData(form);
-  try {
-    await Api.post(`/conversations/${id}/messages`, { body: fd.get('body') });
+  const body = String(fd.get('body') || '').trim();
+  if (!body) return;
+
+  const user = Auth.getUser();
+  const sentViaWs = Realtime.sendMessage(id, body);
+
+  if (sentViaWs) {
     form.reset();
-    const msgs = await Api.get(`/conversations/${id}/messages`);
-    const user = Auth.getUser();
-    const box = document.getElementById('message-list');
-    if (box) {
-      box.innerHTML = msgs.map((m) => {
-        const mine = m.sender_id === user.id;
-        return `<div class="message ${mine ? 'mine' : 'theirs'}">
-          <p>${Utils.escapeHtml(m.body)}</p>
-          <small>${Utils.formatDate(m.sent_at)}</small>
-        </div>`;
-      }).join('');
-      box.scrollTop = box.scrollHeight;
-    }
+    return;
+  }
+
+  try {
+    const message = await Api.post(`/conversations/${id}/messages`, { body });
+    form.reset();
+    Messages.appendMessage(message, user);
   } catch (err) {
     Utils.showToast(Utils.parseApiError(err), 'error');
   }
 };
 
-document.addEventListener('submit', (e) => {
-  if (e.target.id === 'add-conversation-form') {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const id = fd.get('conv_id')?.trim();
-    if (!id) return;
-    Store.saveConversation({
-      id,
-      job_id: '',
-      phase: 'active',
-      client_id: '',
-      freelancer_id: '',
-      created_at: new Date().toISOString(),
-    }, { job_title: fd.get('job_title') || 'Conversation' });
-    Utils.showToast('Conversation added', 'success');
-    Router.navigate(`/messages/${id}`);
-  }
-});
-
 document.addEventListener('click', async (e) => {
   if (e.target.id === 'report-freelancer' || e.target.id === 'report-client') {
     const userId = e.target.dataset.userId;
-    const description = prompt('Describe the issue:');
+    const description = prompt('Describe the issue (required):');
     if (!description?.trim()) return;
     try {
       await Api.post('/reports', { reported_user_id: userId, description });
@@ -140,8 +182,4 @@ document.addEventListener('click', async (e) => {
       Utils.showToast(Utils.parseApiError(err), 'error');
     }
   }
-});
-
-window.addEventListener('hashchange', () => {
-  if (!Router.getPath().startsWith('/messages/')) Messages.stopPolling();
 });

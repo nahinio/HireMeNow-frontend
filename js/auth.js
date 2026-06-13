@@ -14,13 +14,15 @@ const Auth = {
   setSession(token, user) {
     localStorage.setItem(CONFIG.TOKEN_KEY, token);
     Utils.writeJson(CONFIG.USER_KEY, user);
-    App.updateNav();
+    App.updateShell(Router.getPath());
+    if (typeof Realtime !== 'undefined') Realtime.connect();
   },
 
   clearSession() {
+    if (typeof Realtime !== 'undefined') Realtime.disconnect();
     localStorage.removeItem(CONFIG.TOKEN_KEY);
     localStorage.removeItem(CONFIG.USER_KEY);
-    App.updateNav();
+    App.updateShell(Router.getPath());
   },
 
   async login(email, password, admin = false) {
@@ -38,14 +40,26 @@ const Auth = {
       email: payload.email,
       password: payload.password,
     }, { auth: false });
-    Auth.setSession(loginData.access_token, user);
-    return user;
+    const me = await Api.get('/auth/me');
+    Auth.setSession(loginData.access_token, me);
+    return me;
   },
 
   logout() {
     Auth.clearSession();
     Router.navigate('/');
     Utils.showToast('Logged out', 'success');
+  },
+
+  handleSessionExpired() {
+    const user = Auth.getUser();
+    const onAdmin = Router.getPath().startsWith('/admin') && Router.getPath() !== '/admin/login';
+    const loginPath = user?.role === 'admin' || onAdmin ? '/admin/login' : '/login';
+    Auth.clearSession();
+    Api.afterMutation();
+    Utils.showToast('Session expired — sign in again', 'error');
+    Router.navigate(loginPath);
+    return loginPath;
   },
 
   requireRole(roles) {
@@ -60,6 +74,14 @@ const Auth = {
       return false;
     }
     return true;
+  },
+
+  async refreshUser() {
+    if (!Auth.getToken()) return null;
+    const user = await Api.get('/auth/me');
+    Utils.writeJson(CONFIG.USER_KEY, user);
+    App.updateShell(Router.getPath());
+    return user;
   },
 
   dashboardPath() {

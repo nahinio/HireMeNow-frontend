@@ -13,6 +13,39 @@ const Utils = {
     return new Date(iso).toLocaleString();
   },
 
+  formatDateShort(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  },
+
+  formatDateCard(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  },
+
+  jobCardTheme(seed) {
+    const themes = [
+      { bg: '#f5f5f5', accent: '#e5e5e5' },
+      { bg: '#fafafa', accent: '#ebebeb' },
+      { bg: '#f0f0f0', accent: '#d4d4d4' },
+      { bg: '#f7f7f7', accent: '#e0e0e0' },
+      { bg: '#ededed', accent: '#d9d9d9' },
+      { bg: '#ececec', accent: '#d0d0d0' },
+    ];
+    const hash = String(seed || '')
+      .split('')
+      .reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    return themes[hash % themes.length];
+  },
+
+  initial(name) {
+    return String(name || '?').trim().charAt(0).toUpperCase() || '?';
+  },
+
   formatMoney(val, negotiable) {
     if (negotiable) return 'Negotiable';
     if (val == null || val === '') return '—';
@@ -24,6 +57,40 @@ const Utils = {
     if (url.startsWith('http://') || url.startsWith('https://')) return url;
     if (url.startsWith('/')) return CONFIG.API_BASE + url;
     return CONFIG.API_BASE + '/' + url;
+  },
+
+  cacheBustMediaUrl(url) {
+    const resolved = Utils.resolveMediaUrl(url);
+    if (!resolved) return '';
+    const sep = resolved.includes('?') ? '&' : '?';
+    return `${resolved}${sep}v=${Date.now()}`;
+  },
+
+  getYoutubeVideoId(url) {
+    if (!url) return '';
+    try {
+      const u = new URL(url);
+      if (u.hostname === 'youtu.be') return u.pathname.slice(1).split('/')[0] || '';
+      if (u.hostname.includes('youtube.com')) {
+        if (u.pathname.startsWith('/embed/')) return u.pathname.split('/')[2] || '';
+        if (u.pathname.startsWith('/shorts/')) return u.pathname.split('/')[2] || '';
+        return u.searchParams.get('v') || '';
+      }
+    } catch {
+      return '';
+    }
+    return '';
+  },
+
+  isYoutubeUrl(url) {
+    return Boolean(Utils.getYoutubeVideoId(url));
+  },
+
+  getCourseThumbnail(course) {
+    if (course?.thumbnail_url) return Utils.resolveMediaUrl(course.thumbnail_url);
+    const videoId = Utils.getYoutubeVideoId(course?.link);
+    if (videoId) return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    return '';
   },
 
   getQueryParams() {
@@ -52,7 +119,10 @@ const Utils = {
   },
 
   buildHash(path, params = {}) {
-    const qs = new URLSearchParams(params).toString();
+    const clean = Object.fromEntries(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    );
+    const qs = new URLSearchParams(clean).toString();
     return qs ? `#${path}?${qs}` : `#${path}`;
   },
 
@@ -128,5 +198,90 @@ const Utils = {
     }
     if (err.title) return err.detail || err.title;
     return 'Request failed';
+  },
+
+  getMissingSkillBadges(err) {
+    const detail = err?.detail;
+    if (detail && typeof detail === 'object' && Array.isArray(detail.missing_skills)) {
+      return detail.missing_skills.filter(Boolean);
+    }
+    return null;
+  },
+
+  closeModal() {
+    const modal = document.getElementById('app-modal');
+    modal?.remove();
+    document.body.classList.remove('hm-modal-open');
+    if (Utils._modalEscHandler) {
+      document.removeEventListener('keydown', Utils._modalEscHandler);
+      Utils._modalEscHandler = null;
+    }
+  },
+
+  showModal({ title, subtitle = '', body = '', primaryLabel = 'OK', primaryPath = '', dismissLabel = 'Close' }) {
+    Utils.closeModal();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'app-modal';
+    overlay.className = 'modal-overlay hm-modal open';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.innerHTML = `
+      <div class="hm-modal-panel">
+        <button type="button" class="hm-modal-close" aria-label="Close">×</button>
+        <div class="hm-modal-body">
+          <h3 class="hm-modal-title">${Utils.escapeHtml(title)}</h3>
+          ${subtitle ? `<p class="hm-modal-sub">${Utils.escapeHtml(subtitle)}</p>` : ''}
+          ${body}
+        </div>
+        <div class="hm-modal-foot">
+          <button type="button" class="btn btn-ghost hm-modal-dismiss">${Utils.escapeHtml(dismissLabel)}</button>
+          ${primaryPath
+            ? `<a class="btn btn-primary hm-modal-primary" data-nav="${Utils.escapeHtml(primaryPath)}">${Utils.escapeHtml(primaryLabel)}</a>`
+            : `<button type="button" class="btn btn-primary hm-modal-primary">${Utils.escapeHtml(primaryLabel)}</button>`}
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+    document.body.classList.add('hm-modal-open');
+
+    const close = () => Utils.closeModal();
+    overlay.querySelector('.hm-modal-close')?.addEventListener('click', close);
+    overlay.querySelector('.hm-modal-dismiss')?.addEventListener('click', close);
+    overlay.querySelector('.hm-modal-primary:not([data-nav])')?.addEventListener('click', close);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+
+    const primaryLink = overlay.querySelector('.hm-modal-primary[data-nav]');
+    if (primaryLink) {
+      primaryLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        const path = primaryLink.getAttribute('data-nav');
+        close();
+        Router.navigate(path);
+      });
+    }
+
+    Utils._modalEscHandler = (e) => {
+      if (e.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', Utils._modalEscHandler);
+  },
+
+  showSkillBadgeModal(missingSkills) {
+    const skills = (missingSkills || []).map(
+      (name) => `<span class="hm-modal-skill">${Utils.escapeHtml(name)}</span>`,
+    ).join('');
+    Utils.showModal({
+      title: 'Earn skill badges first',
+      subtitle: 'Pass the quiz for each skill below before you can apply to this job.',
+      body: `
+        <div class="hm-modal-icon" aria-hidden="true">${Icons.shield}</div>
+        <div class="hm-modal-skills">${skills}</div>`,
+      primaryLabel: 'Take quizzes',
+      primaryPath: '/freelancer/quizzes',
+      dismissLabel: 'Not now',
+    });
   },
 };
