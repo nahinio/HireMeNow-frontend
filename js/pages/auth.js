@@ -1,74 +1,108 @@
 Object.assign(Pages, {
   login() {
-    return `
-      ${Components.pageHeader('Log in', 'Freelancers and clients')}
-      <form class="form" data-form="login">
-        ${Components.field('Email', 'email', 'email', '', 'required autocomplete="email"')}
-        ${Components.field('Password', 'password', 'password', '', 'required autocomplete="current-password"')}
-        <button type="submit" class="btn btn-primary">Log in</button>
-      </form>
-      <p class="form-footer">
-        <a data-nav="/forgot-password">Forgot password?</a> ·
-        <a data-nav="/register">Create account</a> ·
-        <a data-nav="/admin/login">Admin login</a>
-      </p>`;
+    return Components.authPage({
+      eyebrow: 'Welcome back',
+      title: 'Log in',
+      subtitle: 'Access your freelancer or client dashboard.',
+      content: `
+        <form class="auth-form" data-form="login">
+          ${Components.authField('Email', 'email', 'email', '', 'required autocomplete="email" placeholder="you@example.com"')}
+          ${Components.authField('Password', 'password', 'password', '', 'required autocomplete="current-password" placeholder="••••••••"')}
+          <div class="auth-row auth-row-end">
+            <a class="auth-link" data-nav="/forgot-password">Forgot password?</a>
+          </div>
+          <button type="submit" class="btn btn-primary auth-submit">Log in</button>
+        </form>`,
+      footer: `
+        <p class="auth-footer-text">
+          New here?
+          <a class="auth-link auth-link-strong" data-nav="/register">Create an account</a>
+        </p>
+        <p class="auth-footer-meta">
+          <a class="auth-link" data-nav="/admin/login">Admin login</a>
+        </p>`,
+    });
   },
 
   adminLogin() {
-    return `
-      ${Components.pageHeader('Admin login')}
-      <form class="form" data-form="adminLogin">
-          ${Components.field('Email', 'email', 'email', '', 'required')}
-          ${Components.field('Password', 'password', 'password', '', 'required')}
-          <button type="submit" class="btn btn-primary">Log in as admin</button>
-        </form>
-        <p class="form-footer"><a data-nav="/login">Back to user login</a></p>`;
+    return Components.authPage({
+      eyebrow: 'Administration',
+      title: 'Admin login',
+      subtitle: 'Restricted access for platform administrators.',
+      content: `
+        <form class="auth-form admin-auth-form" data-form="adminLogin">
+          ${Components.authField('Email', 'email', 'email', '', 'required autocomplete="email" placeholder="admin@hiremenow.com"')}
+          ${Components.authField('Password', 'password', 'password', '', 'required autocomplete="current-password" placeholder="••••••••"')}
+          <button type="submit" class="btn btn-primary auth-submit">Log in as admin</button>
+        </form>`,
+      footer: `
+        <p class="auth-footer-text">
+          <a class="auth-link" data-nav="/login">← Back to user login</a>
+        </p>`,
+    });
   },
 
   register() {
-    return `
-      ${Components.pageHeader('Create account')}
-      <form class="form" data-form="register">
-        ${Components.field('Email', 'email', 'email', '', 'required autocomplete="email"')}
-        ${Components.field('Password', 'password', 'password', '', 'required minlength="8" autocomplete="new-password"')}
-        ${Components.field('Role', 'role', 'select', `
-          <option value="freelancer">Freelancer (job seeker)</option>
-          <option value="client">Client (employer)</option>`)}
-        <div id="freelancer-fields">
-          ${Components.field('Display name', 'display_name', 'text', '', 'required')}
-        </div>
-        <div id="client-fields" hidden>
-          ${Components.field('Company name', 'company_name', 'text', '')}
-        </div>
-        <button type="submit" class="btn btn-primary">Register</button>
-      </form>
-      <p class="form-footer"><a data-nav="/login">Already have an account?</a></p>`;
+    return Components.authPage({
+      eyebrow: 'Get started',
+      title: 'Create account',
+      subtitle: 'Join as a freelancer or client in under a minute.',
+      content: `
+        <form class="auth-form" data-form="register">
+          ${Components.authRolePicker('role', 'freelancer')}
+          ${Components.authField('Email', 'email', 'email', '', 'required autocomplete="email" placeholder="you@example.com"')}
+          ${Components.authField('Password', 'password', 'password', '', 'required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"', 'Use 8 or more characters.')}
+          <div id="freelancer-fields">
+            ${Components.authField('Display name', 'display_name', 'text', '', 'required placeholder="How clients will see you"')}
+          </div>
+          <div id="client-fields" hidden>
+            ${Components.authField('Company name', 'company_name', 'text', '', 'placeholder="Optional"')}
+          </div>
+          <button type="submit" class="btn btn-primary auth-submit">Create account</button>
+        </form>`,
+      footer: `
+        <p class="auth-footer-text">
+          Already have an account?
+          <a class="auth-link auth-link-strong" data-nav="/login">Log in</a>
+        </p>`,
+    });
   },
 
   forgotPassword() {
-    return `
-      ${Components.pageHeader('Forgot password')}
-      <form class="form" data-form="forgotPassword">
-        ${Components.field('Email', 'email', 'email', '', 'required')}
-        <button type="submit" class="btn btn-primary">Send reset link</button>
-      </form>
-      <div id="reset-token-area" hidden class="card alert">
-        <p>Dev mode: reset token returned by API</p>
-        <code id="reset-token-display"></code>
-        <a class="btn btn-sm" id="use-reset-token">Use this token</a>
-      </div>
-      <p class="form-footer"><a data-nav="/login">Back to login</a></p>`;
+    return Components.authPage({
+      eyebrow: 'Account recovery',
+      title: 'Forgot password',
+      subtitle: 'We will email you a link to reset your password.',
+      content: `
+        <form class="auth-form" data-form="forgotPassword">
+          ${Components.authField('Email', 'email', 'email', '', 'required autocomplete="email" placeholder="you@example.com"')}
+          <button type="submit" class="btn btn-primary auth-submit">Send reset link</button>
+        </form>
+        <div id="reset-token-area" hidden class="auth-dev-token card alert">
+          <p>Dev mode: reset token returned by API</p>
+          <code id="reset-token-display"></code>
+          <a class="btn btn-sm" id="use-reset-token">Use this token</a>
+        </div>`,
+      footer: `
+        <p class="auth-footer-text">
+          <a class="auth-link" data-nav="/login">← Back to login</a>
+        </p>`,
+    });
   },
 
   resetPassword() {
     const { token } = Utils.getQueryParams();
-    return `
-      ${Components.pageHeader('Reset password')}
-      <form class="form" data-form="resetPassword">
-        ${Components.field('Reset token', 'token', 'text', token || '', 'required')}
-        ${Components.field('New password', 'new_password', 'password', '', 'required minlength="8"')}
-        <button type="submit" class="btn btn-primary">Reset password</button>
-      </form>`;
+    return Components.authPage({
+      eyebrow: 'Account recovery',
+      title: 'Reset password',
+      subtitle: 'Choose a new password for your account.',
+      content: `
+        <form class="auth-form" data-form="resetPassword">
+          ${Components.authField('Reset token', 'token', 'text', token || '', 'required')}
+          ${Components.authField('New password', 'new_password', 'password', '', 'required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"')}
+          <button type="submit" class="btn btn-primary auth-submit">Update password</button>
+        </form>`,
+    });
   },
 });
 
@@ -148,10 +182,29 @@ FormHandlers.resetPassword = async (form) => {
   }
 };
 
+function syncRegisterRoleFields(form) {
+  const role = form?.querySelector('input[name="role"]:checked')?.value || 'freelancer';
+  const isFreelancer = role === 'freelancer';
+  const freelancerFields = document.getElementById('freelancer-fields');
+  const clientFields = document.getElementById('client-fields');
+  if (freelancerFields) freelancerFields.hidden = !isFreelancer;
+  if (clientFields) clientFields.hidden = isFreelancer;
+  form?.querySelectorAll('.auth-role-option').forEach((el) => {
+    const input = el.querySelector('input[type="radio"]');
+    el.classList.toggle('is-active', input?.checked);
+  });
+}
+
 document.addEventListener('change', (e) => {
   if (e.target.name === 'role' && e.target.closest('form[data-form="register"]')) {
-    const isFreelancer = e.target.value === 'freelancer';
-    document.getElementById('freelancer-fields').hidden = !isFreelancer;
-    document.getElementById('client-fields').hidden = isFreelancer;
+    syncRegisterRoleFields(e.target.closest('form'));
   }
+});
+
+document.addEventListener('click', (e) => {
+  const option = e.target.closest('.auth-role-option');
+  if (!option) return;
+  const form = option.closest('form[data-form="register"]');
+  if (!form) return;
+  requestAnimationFrame(() => syncRegisterRoleFields(form));
 });

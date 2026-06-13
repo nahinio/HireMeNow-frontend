@@ -109,6 +109,60 @@ const Components = {
       </header>`;
   },
 
+  authPage({ title, subtitle = '', eyebrow = '', content = '', footer = '' }) {
+    return `
+      <div class="auth-page">
+        <div class="auth-card">
+          <header class="auth-header">
+            ${Components.siteLogo({ className: 'logo auth-logo', height: 40, path: '/' })}
+            ${eyebrow ? `<p class="auth-eyebrow">${Utils.escapeHtml(eyebrow)}</p>` : ''}
+            <h1 class="auth-title">${Utils.escapeHtml(title)}</h1>
+            ${subtitle ? `<p class="auth-subtitle">${Utils.escapeHtml(subtitle)}</p>` : ''}
+          </header>
+          ${content}
+          ${footer ? `<footer class="auth-footer">${footer}</footer>` : ''}
+        </div>
+        <p class="auth-back-home"><a data-nav="/">← Back to home</a></p>
+      </div>`;
+  },
+
+  authField(label, name, type = 'text', value = '', attrs = '', hint = '') {
+    const id = `field-${name}`;
+    let control = '';
+    if (type === 'select') {
+      control = `<select id="${id}" name="${name}" class="auth-input" ${attrs}>${value}</select>`;
+    } else if (type === 'textarea') {
+      control = `<textarea id="${id}" name="${name}" class="auth-input" ${attrs}>${Utils.escapeHtml(value)}</textarea>`;
+    } else {
+      control = `<input type="${type}" id="${id}" name="${name}" class="auth-input" value="${Utils.escapeHtml(value)}" ${attrs}>`;
+    }
+    return `
+      <div class="auth-field">
+        <label class="auth-label" for="${id}">${Utils.escapeHtml(label)}</label>
+        ${control}
+        ${hint ? `<p class="auth-hint">${Utils.escapeHtml(hint)}</p>` : ''}
+      </div>`;
+  },
+
+  authRolePicker(name = 'role', value = 'freelancer') {
+    const options = [
+      { id: 'freelancer', label: 'Freelancer', hint: 'Find work' },
+      { id: 'client', label: 'Client', hint: 'Hire talent' },
+    ];
+    return `
+      <div class="auth-field">
+        <span class="auth-label">I am a</span>
+        <div class="auth-role-picker" role="radiogroup" aria-label="Account type">
+          ${options.map((opt) => `
+            <label class="auth-role-option ${opt.id === value ? 'is-active' : ''}">
+              <input type="radio" name="${name}" value="${opt.id}" ${opt.id === value ? 'checked' : ''}>
+              <span class="auth-role-label">${Utils.escapeHtml(opt.label)}</span>
+              <span class="auth-role-hint">${Utils.escapeHtml(opt.hint)}</span>
+            </label>`).join('')}
+        </div>
+      </div>`;
+  },
+
   feedTabs(tabs, active) {
     return `
       <nav class="feed-tabs" aria-label="Feed">
