@@ -734,6 +734,22 @@ FormHandlers.adminCreateCourse = async (form) => {
 };
 
 document.addEventListener('click', async (e) => {
+  const deleteBtn = e.target.closest('.delete-admin-user');
+  if (deleteBtn) {
+    const id = deleteBtn.dataset.id;
+    const name = deleteBtn.dataset.name || 'this user';
+    const role = deleteBtn.dataset.role || 'user';
+    if (!confirm(`Permanently delete ${name}? Their ${role} profile will be removed and they cannot log in again.`)) return;
+    try {
+      await Api.delete(`/admin/users/${id}`);
+      Utils.showToast(`${name} deleted`, 'success');
+      Router.render();
+    } catch (err) {
+      Utils.showToast(Utils.parseApiError(err), 'error');
+    }
+    return;
+  }
+
   if (e.target.classList.contains('resolve-report')) {
     const id = e.target.dataset.id;
     const status = e.target.dataset.status;

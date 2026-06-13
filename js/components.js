@@ -1182,6 +1182,11 @@ const Components = {
           ? '<span class="badge badge-skill-inactive">Banned</span>'
           : '<span class="badge badge-skill-active">Active</span>';
       const roleLabel = u.role === 'client' ? 'Client' : 'Freelancer';
+      const actions = !u.is_deleted
+        ? `<div class="admin-row-actions">
+            <button type="button" class="btn btn-sm btn-ghost-danger delete-admin-user" data-id="${u.id}" data-name="${Utils.escapeHtml(u.display_name)}" data-role="${Utils.escapeHtml(u.role)}">Delete</button>
+          </div>`
+        : '—';
       return `
         <tr>
           <td class="admin-td-title">
@@ -1191,6 +1196,7 @@ const Components = {
           <td><span class="badge">${Utils.escapeHtml(roleLabel)}</span></td>
           <td>${status}</td>
           <td class="admin-td-date">${Utils.formatDateShort(u.created_at)}</td>
+          <td class="admin-td-actions">${actions}</td>
         </tr>`;
     }).join('');
 
@@ -1203,6 +1209,7 @@ const Components = {
               <th>Role</th>
               <th>Status</th>
               <th>Joined</th>
+              <th aria-label="Actions"></th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
