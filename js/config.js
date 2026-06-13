@@ -9,7 +9,7 @@ const CONFIG = {
   /** Local: same host as the page on port 8000. Deployed: Render API. */
   API_BASE: isLocalDev
     ? `${location.protocol}//${location.hostname}:8000`
-    : 'https://hiremenow-backend-8la2.onrender.com',
+    : 'https://hiremenow-backend-faster.onrender.com',
   API_PREFIX: '/api/v1',
   TOKEN_KEY: 'hiremenow_token',
   USER_KEY: 'hiremenow_user',

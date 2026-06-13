@@ -1,6 +1,6 @@
 # HireMeNow Frontend
 
-Static HTML/CSS/JS frontend for the [HireMeNow API](https://hiremenow-backend-8la2.onrender.com).
+Static HTML/CSS/JS frontend for the [HireMeNow API](https://hiremenow-backend-faster.onrender.com).
 
 This folder is self-contained — copy it to its own repo and deploy anywhere static files are hosted.
 
