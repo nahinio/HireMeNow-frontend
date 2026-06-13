@@ -1037,11 +1037,12 @@ const Components = {
                   ? `<img src="${Utils.escapeHtml(Utils.resolveMediaUrl(profile.profile_picture_url))}" alt="">`
                   : `<span class="freelancer-profile-media-placeholder">${Utils.escapeHtml(Utils.initial(profile.display_name))}</span>`}
               </div>
-              <label class="freelancer-profile-upload">
-                <input type="file" id="profile-picture" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" hidden>
-                <span class="freelancer-profile-upload-btn">Upload photo</span>
+              <label class="hm-file-upload freelancer-profile-upload" for="profile-picture">
+                <input type="file" id="profile-picture" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp">
+                <span class="hm-file-upload-btn">Choose photo</span>
+                <span class="hm-file-upload-name" data-placeholder="JPG, PNG or WebP">JPG, PNG or WebP</span>
               </label>
-              <p class="freelancer-profile-upload-hint">Select an image — it uploads automatically.</p>
+              <p class="hm-file-upload-hint">Uploads automatically when selected.</p>
             </section>
 
             <section class="freelancer-profile-card">
@@ -1054,11 +1055,12 @@ const Components = {
                 ? `<a class="freelancer-profile-resume-link" href="${Utils.escapeHtml(Utils.resolveMediaUrl(profile.resume_url))}" target="_blank" rel="noopener noreferrer">View current resume</a>`
                 : '<p class="freelancer-profile-empty">No resume uploaded yet.</p>'}
               </div>
-              <label class="freelancer-profile-upload">
-                <input type="file" id="profile-resume" accept=".pdf,application/pdf" hidden>
-                <span class="freelancer-profile-upload-btn">Upload PDF resume</span>
+              <label class="hm-file-upload freelancer-profile-upload" for="profile-resume">
+                <input type="file" id="profile-resume" accept=".pdf,application/pdf">
+                <span class="hm-file-upload-btn">Choose PDF</span>
+                <span class="hm-file-upload-name" data-placeholder="No file chosen">No file chosen</span>
               </label>
-              <p class="freelancer-profile-upload-hint">Select a PDF — it uploads automatically.</p>
+              <p class="hm-file-upload-hint">Uploads automatically when selected.</p>
             </section>
           </div>
         </div>
@@ -1380,6 +1382,26 @@ const Components = {
   tableSkeleton(rows = 4) {
     return `<div class="skeleton-table">${Array.from({ length: rows }, () => `
       <div class="skeleton-table-row"><div class="skeleton-line"></div></div>`).join('')}</div>`;
+  },
+
+  fileUpload({
+    id,
+    name = '',
+    accept = '',
+    label = 'Choose file',
+    placeholder = 'No file chosen',
+    hint = '',
+    className = '',
+  } = {}) {
+    const acceptAttr = accept ? ` accept="${Utils.escapeHtml(accept)}"` : '';
+    const nameAttr = name ? ` name="${Utils.escapeHtml(name)}"` : '';
+    return `
+      <label class="hm-file-upload ${className}" for="${Utils.escapeHtml(id)}">
+        <input type="file" id="${Utils.escapeHtml(id)}"${nameAttr}${acceptAttr}>
+        <span class="hm-file-upload-btn">${Utils.escapeHtml(label)}</span>
+        <span class="hm-file-upload-name" data-placeholder="${Utils.escapeHtml(placeholder)}">${Utils.escapeHtml(placeholder)}</span>
+      </label>
+      ${hint ? `<p class="hm-file-upload-hint">${Utils.escapeHtml(hint)}</p>` : ''}`;
   },
 
   field(label, name, type = 'text', value = '', attrs = '') {

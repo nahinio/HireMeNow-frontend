@@ -259,10 +259,15 @@ Object.assign(Pages, {
               ${Components.field('Link', 'link', 'url', 'https://www.youtube.com/watch?v=…', 'required')}
             </div>
             <div class="admin-file-field">
-              <label for="course-thumbnail">Thumbnail <span class="field-optional">(optional)</span></label>
+              <label for="course-thumbnail-url-text">Thumbnail <span class="field-optional">(optional)</span></label>
               <p class="field-hint">Upload an image or paste a URL. YouTube course links show the video thumbnail automatically when left empty.</p>
               <input type="url" name="thumbnail_url_text" id="course-thumbnail-url-text" placeholder="https://… thumbnail URL">
-              <input type="file" id="course-thumbnail" accept="image/*">
+              ${Components.fileUpload({
+                id: 'course-thumbnail',
+                accept: 'image/*',
+                label: 'Choose image',
+                placeholder: 'Or use URL above',
+              })}
               <input type="hidden" name="thumbnail_url" id="course-thumbnail-url">
             </div>
           </form>`,
@@ -797,6 +802,8 @@ document.addEventListener('change', async (e) => {
       const res = await Api.upload('/admin/courses/thumbnail', e.target.files[0]);
       document.getElementById('course-thumbnail-url').value = res.url;
       Utils.showToast('Thumbnail uploaded', 'success');
+      e.target.value = '';
+      Utils.syncFileUpload(e.target);
     } catch (err) {
       Utils.showToast(Utils.parseApiError(err), 'error');
     }

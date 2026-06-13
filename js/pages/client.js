@@ -50,10 +50,14 @@ Object.assign(Pages, {
           <div id="client-photo-preview">
           ${p.profile_picture_url ? `<img class="preview-img portal-preview-img" src="${Utils.escapeHtml(Utils.resolveMediaUrl(p.profile_picture_url))}" alt="">` : '<p class="admin-form-hint">Upload a square logo for your company profile.</p>'}
           </div>
-          <div class="admin-file-field">
-            <input type="file" id="client-picture" accept="image/jpeg,image/png,image/webp">
-          </div>`,
-        footer: '<button type="button" class="btn btn-ghost" id="upload-client-picture">Upload logo</button>',
+          ${Components.fileUpload({
+            id: 'client-picture',
+            accept: 'image/jpeg,image/png,image/webp',
+            label: 'Choose logo',
+            placeholder: 'JPG, PNG or WebP',
+            hint: 'Uploads automatically when selected.',
+          })}`,
+        footer: '',
       })}
       ${Components.adminComposePanel({
         label: 'Danger zone',
@@ -123,9 +127,14 @@ Object.assign(Pages, {
             <details class="job-post-extra">
               <summary>Cover image <span class="job-post-optional">optional</span></summary>
               <div class="job-post-extra-body">
-                <input type="file" id="job-thumbnail" accept="image/jpeg,image/png,image/webp">
+                ${Components.fileUpload({
+                  id: 'job-thumbnail',
+                  accept: 'image/jpeg,image/png,image/webp',
+                  label: 'Choose image',
+                  placeholder: 'No file chosen',
+                })}
                 <input type="hidden" name="thumbnail_url" id="thumbnail-url">
-                <p id="thumbnail-status" class="job-post-hint">JPG, PNG or WebP · shown on the job listing</p>
+                <p id="thumbnail-status" class="hm-file-upload-hint">JPG, PNG or WebP · shown on the job listing</p>
               </div>
             </details>
 
@@ -203,11 +212,30 @@ FormHandlers.createJob = async (form) => {
 };
 
 document.addEventListener('change', async (e) => {
+  if (e.target.id === 'client-picture' && e.target.files?.[0]) {
+    try {
+      const res = await Api.upload('/client/profile/picture', e.target.files[0]);
+      Utils.showToast('Logo uploaded', 'success');
+      await Auth.refreshUser();
+      const preview = document.getElementById('client-photo-preview');
+      if (preview && res?.url) {
+        preview.innerHTML = `<img class="preview-img portal-preview-img" src="${Utils.escapeHtml(Utils.cacheBustMediaUrl(res.url))}" alt="">`;
+      }
+      e.target.value = '';
+      Utils.syncFileUpload(e.target);
+    } catch (err) {
+      Utils.showToast(Utils.parseApiError(err), 'error');
+    }
+    return;
+  }
   if (e.target.id === 'job-thumbnail' && e.target.files?.[0]) {
     try {
       const res = await Api.upload('/jobs/thumbnail', e.target.files[0]);
       document.getElementById('thumbnail-url').value = res.url;
-      document.getElementById('thumbnail-status').textContent = 'Thumbnail uploaded ✓';
+      const status = document.getElementById('thumbnail-status');
+      if (status) status.textContent = 'Thumbnail uploaded ✓';
+      e.target.value = '';
+      Utils.syncFileUpload(e.target);
     } catch (err) {
       Utils.showToast(Utils.parseApiError(err), 'error');
     }
@@ -215,22 +243,6 @@ document.addEventListener('change', async (e) => {
 });
 
 document.addEventListener('click', async (e) => {
-  if (e.target.id === 'upload-client-picture') {
-    const input = document.getElementById('client-picture');
-    if (!input?.files?.[0]) return Utils.showToast('Choose an image', 'error');
-    try {
-      const res = await Api.upload('/client/profile/picture', input.files[0]);
-      Utils.showToast('Logo uploaded', 'success');
-      await Auth.refreshUser();
-      const preview = document.getElementById('client-photo-preview');
-      if (preview && res?.url) {
-        preview.innerHTML = `<img src="${Utils.escapeHtml(Utils.cacheBustMediaUrl(res.url))}" alt="">`;
-      }
-      input.value = '';
-    } catch (err) {
-      Utils.showToast(Utils.parseApiError(err), 'error');
-    }
-  }
   if (e.target.id === 'delete-client-profile') {
     if (!confirm('Delete your company account?')) return;
     try {

@@ -269,6 +269,25 @@ const Utils = {
     document.addEventListener('keydown', Utils._modalEscHandler);
   },
 
+  syncFileUpload(input) {
+    if (!input) return;
+    const nameEl = input.closest('.hm-file-upload')?.querySelector('.hm-file-upload-name');
+    if (!nameEl) return;
+    const placeholder = nameEl.dataset.placeholder || 'No file chosen';
+    const file = input.files?.[0];
+    nameEl.textContent = file?.name || placeholder;
+    nameEl.classList.toggle('has-file', Boolean(file));
+  },
+
+  initFileUploads(root = document) {
+    root.querySelectorAll('.hm-file-upload input[type="file"]').forEach((input) => {
+      if (input.dataset.fileUiBound) return;
+      input.dataset.fileUiBound = '1';
+      input.addEventListener('change', () => Utils.syncFileUpload(input));
+      Utils.syncFileUpload(input);
+    });
+  },
+
   showSkillBadgeModal(missingSkills) {
     const skills = (missingSkills || []).map(
       (name) => `<span class="hm-modal-skill">${Utils.escapeHtml(name)}</span>`,

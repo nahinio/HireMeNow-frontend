@@ -2156,39 +2156,80 @@ body.layout-public-portal .admin-panel-secondary {
 }
 
 .freelancer-profile-upload {
-  display: block;
   margin: 0 1.15rem 0.55rem;
+}
+
+.hm-file-upload {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
   cursor: pointer;
 }
 
-.freelancer-profile-upload-btn {
-  display: block;
-  padding: 0.65rem 0.85rem;
-  border-radius: 10px;
-  border: 1px dashed #d4d4d4;
-  background: var(--bg-subtle);
+.hm-file-upload input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.hm-file-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg);
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--text-secondary);
-  text-align: center;
-  transition: border-color var(--transition), background var(--transition), color var(--transition);
-}
-
-.freelancer-profile-upload:hover .freelancer-profile-upload-btn {
-  border-color: #a3a3a3;
-  background: var(--bg-muted);
   color: var(--text);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition), opacity var(--transition);
 }
 
-.freelancer-profile-upload.is-uploading .freelancer-profile-upload-btn {
-  opacity: 0.7;
+.hm-file-upload:hover .hm-file-upload-btn,
+.hm-file-upload:focus-within .hm-file-upload-btn {
+  border-color: var(--text);
+  background: var(--bg-subtle);
+}
+
+.hm-file-upload-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hm-file-upload-name.has-file {
+  color: var(--text-secondary);
+}
+
+.hm-file-upload-hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.hm-file-upload.is-uploading .hm-file-upload-btn {
+  opacity: 0.65;
   pointer-events: none;
 }
 
-.freelancer-profile-upload-hint {
+.freelancer-profile-card .hm-file-upload-hint {
   margin: 0 1.15rem 1rem;
-  font-size: 0.75rem;
-  color: var(--text-tertiary);
 }
 
 .freelancer-profile-side .btn-block {
@@ -3439,9 +3480,8 @@ body.layout-public-portal .admin-panel-secondary {
   padding-top: 0.85rem;
 }
 
-.job-post-extra-body input[type="file"] {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
+.job-post-extra-body .hm-file-upload {
+  margin-top: 0;
 }
 
 .job-post-actions {
@@ -4319,9 +4359,8 @@ body.layout-public-portal .admin-panel-secondary {
   color: var(--text-tertiary);
 }
 
-.admin-file-field input[type="file"] {
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
+.admin-file-field .hm-file-upload {
+  margin-top: 0.65rem;
 }
 
 .admin-filters-form .admin-compose-body {

@@ -255,8 +255,8 @@ async function uploadFreelancerProfileFile(input, { path, successMessage, refres
   const file = input?.files?.[0];
   if (!file) return;
 
-  const zone = input.closest('.freelancer-profile-upload');
-  const btn = zone?.querySelector('.freelancer-profile-upload-btn');
+  const zone = input.closest('.hm-file-upload');
+  const btn = zone?.querySelector('.hm-file-upload-btn');
   const defaultLabel = btn?.dataset.defaultLabel || btn?.textContent || 'Upload';
   if (btn) {
     btn.dataset.defaultLabel = defaultLabel;
@@ -276,6 +276,7 @@ async function uploadFreelancerProfileFile(input, { path, successMessage, refres
     if (btn) btn.textContent = defaultLabel;
     zone?.classList.remove('is-uploading');
     input.value = '';
+    Utils.syncFileUpload(input);
   }
 }
 

@@ -65,6 +65,7 @@ const Router = {
 
   afterRender(path) {
     Dropdowns.enhance(document.getElementById('main'));
+    Utils.initFileUploads(document.getElementById('main'));
     if (path === '/admin/skills' || /^\/admin\/skills\/[^/]+\/edit$/.test(path)) {
       AdminSkills.initPage();
     }
