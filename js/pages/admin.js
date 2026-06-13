@@ -394,18 +394,84 @@ Object.assign(Pages, {
     return AdminPages.wrap('/admin/jobs', `Applicants · ${id.slice(0, 8)}…`, '', body);
   },
 
+  adminUsersShell() {
+    if (!Auth.requireRole(['admin'])) return '';
+    AdminPages.ensureNavMetrics();
+    return AdminPages.wrap(
+      '/admin/users',
+      'User moderation',
+      '',
+      '<div class="loading-inline">Loading users…</div>',
+    );
+  },
+
   async adminUsers() {
     if (!Auth.requireRole(['admin'])) return '';
     AdminPages.ensureNavMetrics();
 
+    const params = Utils.getQueryParams();
+    const page = Number(params.page) || 1;
+    const q = params.q || '';
+    const role = params.role || '';
+
+    let data;
+    try {
+      data = await Api.get('/admin/users', {
+        query: {
+          page,
+          limit: 50,
+          q: q || undefined,
+          role: role || undefined,
+        },
+        cache: false,
+      });
+    } catch (err) {
+      if (err?.handled) return false;
+      data = { items: [], page: 1, limit: 50, total: 0 };
+    }
+
+    const filterParams = { q: q || undefined, role: role || undefined };
+    const chips = [];
+    if (q) chips.push({ label: q, params: { role: role || undefined } });
+    if (role) {
+      chips.push({
+        label: role === 'client' ? 'Clients' : 'Freelancers',
+        params: { q: q || undefined },
+      });
+    }
+
     const body = `
-      <div class="admin-compose-grid">
+      ${Components.adminComposePanel({
+        label: 'Directory',
+        title: 'Clients & freelancers',
+        meta: `${data.total || 0} total`,
+        body: `
+          ${Components.filterToolbarBlock({
+            id: 'admin-user-filters',
+            path: '/admin/users',
+            search: { name: 'q', placeholder: 'Search name or email…', value: q },
+            selects: [{
+              name: 'role',
+              label: 'Role',
+              value: role,
+              options: `
+                <option value="">All roles</option>
+                <option value="freelancer"${role === 'freelancer' ? ' selected' : ''}>Freelancers</option>
+                <option value="client"${role === 'client' ? ' selected' : ''}>Clients</option>`,
+            }],
+            chips,
+            clearParams: filterParams,
+          })}
+          ${Components.adminUsersTable(data.items || [], { withActions: true })}
+          ${Components.pagination(data.page, data.limit, data.total, '/admin/users', filterParams)}`,
+      })}
+      <div class="admin-compose-grid admin-users-actions">
         ${Components.adminComposePanel({
           label: 'Account action',
           title: 'Ban user',
           body: `
             <form class="admin-compose-form" data-form="adminBanUser" id="admin-ban-user-form">
-              <p class="admin-form-hint">Permanently ban a user by UUID. Use reports or job data to find the ID.</p>
+              <p class="admin-form-hint">Ban blocks login and removes pending activity. Use the table above or enter a user ID.</p>
               ${Components.field('User ID', 'user_id', 'text', '', 'required placeholder="00000000-0000-0000-0000-000000000000"')}
               ${Components.field('Ban reason', 'ban_reason', 'textarea', '', 'required rows="3"')}
             </form>`,
@@ -688,6 +754,7 @@ FormHandlers.adminBanUser = async (form) => {
     });
     Utils.showToast(`User banned (${res.role})`, 'success');
     form.reset();
+    Router.render();
   } catch (err) {
     Utils.showToast(Utils.parseApiError(err), 'error');
   }
@@ -706,6 +773,39 @@ FormHandlers.adminDeleteReview = async (form) => {
 };
 
 document.addEventListener('click', async (e) => {
+  const deleteBtn = e.target.closest('.delete-admin-user');
+  if (deleteBtn) {
+    const id = deleteBtn.dataset.id;
+    const name = deleteBtn.dataset.name || 'this user';
+    const role = deleteBtn.dataset.role || 'user';
+    if (!confirm(`Permanently delete ${name}? Their ${role} profile will be removed and they cannot log in again.`)) return;
+    try {
+      await Api.delete(`/admin/users/${id}`);
+      Utils.showToast(`${name} deleted`, 'success');
+      Router.render();
+    } catch (err) {
+      Utils.showToast(Utils.parseApiError(err), 'error');
+    }
+    return;
+  }
+
+  const banBtn = e.target.closest('.ban-admin-user');
+  if (banBtn) {
+    const id = banBtn.dataset.id;
+    const name = banBtn.dataset.name || 'this user';
+    const reason = prompt(`Ban reason for ${name}:`);
+    if (!reason || !reason.trim()) return;
+    if (!confirm(`Ban ${name}?`)) return;
+    try {
+      await Api.post(`/admin/users/${id}/ban`, { ban_reason: reason.trim() });
+      Utils.showToast(`${name} banned`, 'success');
+      Router.render();
+    } catch (err) {
+      Utils.showToast(Utils.parseApiError(err), 'error');
+    }
+    return;
+  }
+
   if (e.target.classList.contains('resolve-report')) {
     const id = e.target.dataset.id;
     const status = e.target.dataset.status;

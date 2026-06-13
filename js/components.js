@@ -1171,6 +1171,53 @@ const Components = {
       </div>`;
   },
 
+  adminUsersTable(users, { withActions = true } = {}) {
+    if (!users?.length) {
+      return `<div class="admin-empty-panel">${Components.emptyState('No users found')}</div>`;
+    }
+    const rows = users.map((u) => {
+      const status = u.is_deleted
+        ? '<span class="badge badge-skill-inactive">Deleted</span>'
+        : u.is_banned
+          ? '<span class="badge badge-skill-inactive">Banned</span>'
+          : '<span class="badge badge-skill-active">Active</span>';
+      const roleLabel = u.role === 'client' ? 'Client' : 'Freelancer';
+      const actions = withActions && !u.is_deleted
+        ? `<div class="admin-row-actions">
+            ${!u.is_banned ? `<button type="button" class="btn btn-sm btn-ghost ban-admin-user" data-id="${u.id}" data-name="${Utils.escapeHtml(u.display_name)}">Ban</button>` : ''}
+            <button type="button" class="btn btn-sm btn-ghost-danger delete-admin-user" data-id="${u.id}" data-name="${Utils.escapeHtml(u.display_name)}" data-role="${Utils.escapeHtml(u.role)}">Delete</button>
+          </div>`
+        : '—';
+      return `
+        <tr>
+          <td class="admin-td-title">
+            <span class="admin-entity-name">${Utils.escapeHtml(u.display_name)}</span>
+            <span class="admin-td-sub">${Utils.escapeHtml(u.email)}</span>
+          </td>
+          <td><span class="badge">${Utils.escapeHtml(roleLabel)}</span></td>
+          <td>${status}</td>
+          <td class="admin-td-date">${Utils.formatDateShort(u.created_at)}</td>
+          <td class="admin-td-actions">${actions}</td>
+        </tr>`;
+    }).join('');
+
+    return `
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Joined</th>
+              <th aria-label="Actions"></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  },
+
   adminReportsTable(reports, { withActions = false } = {}) {
     if (!reports?.length) {
       return `<div class="admin-empty-panel">${Components.emptyState('No reports')}</div>`;

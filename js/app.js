@@ -509,7 +509,7 @@ const App = {
     Router.register('/admin/reports', Pages.adminReports);
     Router.register('/admin/jobs', Pages.adminJobs);
     Router.register('/admin/jobs/:id/applicants', Pages.adminJobApplicants);
-    Router.register('/admin/users', Pages.adminUsers);
+    Router.register('/admin/users', Pages.adminUsers, Pages.adminUsersShell);
   },
 };
 

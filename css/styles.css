@@ -4278,6 +4278,10 @@ body.layout-public-portal .admin-panel-secondary {
   color: var(--text-tertiary);
 }
 
+.admin-users-actions {
+  margin-top: 1.5rem;
+}
+
 .admin-compose-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
