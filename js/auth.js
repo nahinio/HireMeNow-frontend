@@ -49,7 +49,13 @@ const Auth = {
 
   logout() {
     Auth.clearSession();
-    Router.navigate('/');
+    const landing = '/';
+    if (Router.getPath() === landing) {
+      App.updateShell(landing);
+      Router.render();
+    } else {
+      Router.navigate(landing);
+    }
     Utils.showToast('Logged out', 'success');
   },
 

@@ -14,8 +14,10 @@ const App = {
     return path.startsWith('/client')
       || path.startsWith('/messages')
       || path === '/jobs'
+      || path === '/freelancers'
       || /^\/jobs\/[^/]+$/.test(path)
-      || /^\/jobs\/[^/]+\/review$/.test(path);
+      || /^\/jobs\/[^/]+\/review$/.test(path)
+      || /^\/freelancers\/[^/]+$/.test(path);
   },
 
   isFreelancerPortalUser(user, path, loggedIn = Boolean(user && Auth.getToken())) {
@@ -146,17 +148,7 @@ const App = {
 
     const user = Auth.getUser();
     const loggedIn = Boolean(user && Auth.getToken());
-    let home = '/';
-
-    if (loggedIn && user.role === 'admin' && path.startsWith('/admin') && path !== '/admin/login') {
-      home = '/admin';
-    } else if (loggedIn && user.role === 'client'
-      && (path.startsWith('/client') || path.startsWith('/messages'))) {
-      home = '/client/dashboard';
-    } else if (loggedIn && user.role === 'freelancer'
-      && App.isFreelancerPortalPath(path)) {
-      home = '/freelancer/dashboard';
-    }
+    const home = loggedIn ? Auth.dashboardPath() : '/';
 
     logo.setAttribute('data-nav', home);
     logo.setAttribute('href', `#${home}`);
@@ -201,6 +193,9 @@ const App = {
     const isAdmin = path.startsWith('/admin') && path !== '/admin/login' && user?.role === 'admin';
     const isClientPortal = user?.role === 'client' && Auth.getToken()
       && App.isClientPortalPath(path);
+    const isFreelancerPortal = App.isFreelancerPortalUser(user, path, loggedIn);
+    const isPublicBrowsing = loggedIn && !isAdmin && !isClientPortal && !isFreelancerPortal
+      && App.isPublicPortalPath(path);
 
     if (loggedIn) {
       const identity = App.getUserMenuIdentity(user);
@@ -212,6 +207,9 @@ const App = {
         html += `<a class="btn btn-sm btn-primary top-post-job" data-nav="/client/jobs/new">${Icons.pen}<span>Post job</span></a>`;
       } else if (user.role === 'client') {
         html += `<a class="btn-write" data-nav="/client/jobs/new">${Icons.pen}<span>Post job</span></a>`;
+      }
+      if (isPublicBrowsing && user.role !== 'admin') {
+        html += `<a class="btn btn-member" data-nav="${Auth.dashboardPath()}">Go to dashboard</a>`;
       }
       html += `
         <div class="user-menu" id="user-menu">
@@ -304,6 +302,7 @@ const App = {
         { label: 'Profile', path: '/client/profile' },
         { label: 'Messages', path: '/messages' },
         { label: 'Browse jobs', path: '/jobs' },
+        { label: 'Browse talent', path: '/freelancers' },
       ];
     }
     return [];
@@ -372,6 +371,7 @@ const App = {
         { icon: Icons.user, label: 'Profile', path: '/client/profile' },
         { icon: Icons.pen, label: 'My jobs', path: '/client/jobs' },
         { icon: Icons.message, label: 'Messages', path: '/messages' },
+        { icon: Icons.people, label: 'Browse talent', path: '/freelancers' },
       );
     }
 

@@ -109,6 +109,7 @@ const PortalPages = {
       { path: '/client/dashboard', label: 'Dashboard' },
       { path: '/client/jobs', label: 'My jobs' },
       { path: '/messages', label: 'Messages' },
+      { path: '/freelancers', label: 'Talent' },
       { path: '/client/profile', label: 'Profile' },
     ];
   },
@@ -118,6 +119,9 @@ const PortalPages = {
       return activePath === '/client/jobs'
         || activePath === '/client/jobs/new'
         || /^\/client\/jobs\/[^/]+\/applicants$/.test(activePath);
+    }
+    if (path === '/freelancers') {
+      return activePath === '/freelancers' || activePath.startsWith('/freelancers/');
     }
     if (path === '/messages') {
       return activePath === '/messages' || activePath.startsWith('/messages/');

@@ -92,16 +92,32 @@ Object.assign(Pages, {
 
   resetPassword() {
     const { token } = Utils.getQueryParams();
+    if (!token) {
+      return Components.authPage({
+        eyebrow: 'Account recovery',
+        title: 'Reset link invalid',
+        subtitle: 'This link is missing or expired. Request a new reset email.',
+        content: `
+          <a class="btn btn-primary auth-submit" data-nav="/forgot-password">Request new link</a>`,
+        footer: `
+          <p class="auth-footer-text">
+            <a class="auth-link" data-nav="/login">← Back to login</a>
+          </p>`,
+      });
+    }
     return Components.authPage({
       eyebrow: 'Account recovery',
       title: 'Reset password',
       subtitle: 'Choose a new password for your account.',
       content: `
         <form class="auth-form" data-form="resetPassword">
-          ${Components.authField('Reset token', 'token', 'text', token || '', 'required')}
           ${Components.authField('New password', 'new_password', 'password', '', 'required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"')}
           <button type="submit" class="btn btn-primary auth-submit">Update password</button>
         </form>`,
+      footer: `
+        <p class="auth-footer-text">
+          <a class="auth-link" data-nav="/login">← Back to login</a>
+        </p>`,
     });
   },
 });
@@ -169,10 +185,16 @@ FormHandlers.forgotPassword = async (form) => {
 };
 
 FormHandlers.resetPassword = async (form) => {
+  const token = Utils.getQueryParams().token;
+  if (!token) {
+    Utils.showToast('Reset link is invalid or expired', 'error');
+    Router.navigate('/forgot-password');
+    return;
+  }
   const fd = new FormData(form);
   try {
     await Api.post('/auth/reset-password', {
-      token: fd.get('token'),
+      token,
       new_password: fd.get('new_password'),
     }, { auth: false });
     Utils.showToast('Password reset successfully', 'success');
