@@ -32,6 +32,7 @@ const PortalPages = {
       { path: '/freelancer/dashboard', label: 'Dashboard' },
       { path: '/freelancer/quizzes', label: 'Quizzes' },
       { path: '/jobs', label: 'Jobs' },
+      { path: '/freelancer/jobs', label: 'Previous jobs' },
       { path: '/messages', label: 'Messages' },
       { path: '/freelancer/profile', label: 'Profile' },
     ];
@@ -51,6 +52,10 @@ const PortalPages = {
     }
     if (path === '/jobs') {
       return activePath === '/jobs' || (activePath.startsWith('/jobs/') && !activePath.endsWith('/review'));
+    }
+    if (path === '/freelancer/jobs') {
+      return activePath === '/freelancer/jobs'
+        || (activePath.startsWith('/jobs/') && activePath.endsWith('/review'));
     }
     if (path === '/messages') {
       return activePath === '/messages' || activePath.startsWith('/messages/');
@@ -124,7 +129,18 @@ const PortalPages = {
     if (!jobs?.length) {
       return `<div class="admin-empty-panel">${Components.emptyState('No jobs posted yet')}</div>`;
     }
-    const rows = jobs.map((job) => `
+    const user = Auth.getUser();
+    jobs.forEach((job) => Store.syncJobViewerState(job));
+
+    const rows = jobs.map((job) => {
+      const partyActions = Components.jobPartyActions(job, user, { compact: true });
+      const actions = [
+        partyActions,
+        `<a class="btn btn-sm btn-ghost" data-nav="/client/jobs/${job.id}/applicants">Applicants</a>`,
+        `<a class="btn btn-sm btn-ghost" data-nav="/jobs/${job.id}">View</a>`,
+      ].filter(Boolean).join('');
+
+      return `
       <tr>
         <td class="admin-td-title">
           <a class="admin-entity-name" data-nav="/jobs/${job.id}">${Utils.escapeHtml(job.title)}</a>
@@ -133,11 +149,10 @@ const PortalPages = {
         <td>${Utils.statusBadge(job.status)}</td>
         <td class="admin-td-date">${Utils.formatDateShort(job.posted_at)}</td>
         <td class="admin-td-actions">
-          <div class="admin-row-actions">
-            <a class="btn btn-sm btn-ghost" data-nav="/client/jobs/${job.id}/applicants">Applicants</a>
-          </div>
+          <div class="admin-row-actions">${actions}</div>
         </td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
 
     return `
       <div class="admin-table-wrap">
@@ -147,6 +162,51 @@ const PortalPages = {
               <th>Job</th>
               <th>Status</th>
               <th>Posted</th>
+              <th aria-label="Actions"></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  },
+
+  freelancerJobsTable(jobs) {
+    if (!jobs?.length) {
+      return `<div class="admin-empty-panel">${Components.emptyState('No previous jobs yet')}</div>`;
+    }
+    const user = Auth.getUser();
+    jobs.forEach((job) => Store.syncJobViewerState(job));
+
+    const rows = jobs.map((job) => {
+      const partyActions = Components.jobPartyActions(job, user, { compact: true });
+      const actions = [
+        partyActions,
+        `<a class="btn btn-sm btn-ghost" data-nav="/jobs/${job.id}">View job</a>`,
+        `<a class="btn btn-sm btn-ghost" data-nav="/messages">Messages</a>`,
+      ].filter(Boolean).join('');
+
+      return `
+      <tr>
+        <td class="admin-td-title">
+          <a class="admin-entity-name" data-nav="/jobs/${job.id}">${Utils.escapeHtml(job.title)}</a>
+          <span class="admin-td-sub">${Utils.escapeHtml(job.company_name || '—')}</span>
+        </td>
+        <td>${Utils.statusBadge(job.status)}</td>
+        <td class="admin-td-date">${Utils.formatDateShort(job.updated_at)}</td>
+        <td class="admin-td-actions">
+          <div class="admin-row-actions">${actions}</div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    return `
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Job</th>
+              <th>Status</th>
+              <th>Updated</th>
               <th aria-label="Actions"></th>
             </tr>
           </thead>

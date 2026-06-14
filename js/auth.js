@@ -12,6 +12,7 @@ const Auth = {
   },
 
   setSession(token, user) {
+    Store.clearViewerState();
     localStorage.setItem(CONFIG.TOKEN_KEY, token);
     Utils.writeJson(CONFIG.USER_KEY, user);
     App.updateShell(Router.getPath());
@@ -20,6 +21,7 @@ const Auth = {
 
   clearSession() {
     if (typeof Realtime !== 'undefined') Realtime.disconnect();
+    Store.clearViewerState();
     localStorage.removeItem(CONFIG.TOKEN_KEY);
     localStorage.removeItem(CONFIG.USER_KEY);
     App.updateShell(Router.getPath());

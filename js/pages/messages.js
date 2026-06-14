@@ -61,7 +61,7 @@ const Messages = {
       return items;
     } catch (err) {
       if (!err?.handled) Utils.showToast(Utils.parseApiError(err), 'error');
-      return Store.getConversations();
+      return [];
     }
   },
 };
@@ -173,8 +173,13 @@ FormHandlers.sendMessage = async (form) => {
 document.addEventListener('click', async (e) => {
   if (e.target.id === 'report-freelancer' || e.target.id === 'report-client') {
     const userId = e.target.dataset.userId;
-    const description = prompt('Describe the issue (required):');
-    if (!description?.trim()) return;
+    const description = await Utils.prompt({
+      title: 'Report user',
+      message: 'Describe the issue so our team can review it.',
+      placeholder: 'What happened?',
+      confirmLabel: 'Submit report',
+    });
+    if (!description) return;
     try {
       await Api.post('/reports', { reported_user_id: userId, description });
       Utils.showToast('Report submitted', 'success');

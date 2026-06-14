@@ -95,4 +95,47 @@ const Store = {
   hasAppliedToJob(jobId) {
     return Store.getAppliedJobIds().has(String(jobId));
   },
+
+  getJobCompletionIds() {
+    return new Set(Utils.readJson(CONFIG.JOB_COMPLETION_KEY, []));
+  },
+
+  markJobCompletionSignalled(jobId) {
+    const ids = Store.getJobCompletionIds();
+    ids.add(String(jobId));
+    Utils.writeJson(CONFIG.JOB_COMPLETION_KEY, [...ids]);
+  },
+
+  hasSignalledCompletion(jobId, job = null) {
+    return Boolean(job?.viewer_has_signalled_completion)
+      || Store.getJobCompletionIds().has(String(jobId));
+  },
+
+  getJobReviewIds() {
+    return new Set(Utils.readJson(CONFIG.JOB_REVIEWS_KEY, []));
+  },
+
+  markJobReviewSubmitted(jobId) {
+    const ids = Store.getJobReviewIds();
+    ids.add(String(jobId));
+    Utils.writeJson(CONFIG.JOB_REVIEWS_KEY, [...ids]);
+  },
+
+  hasSubmittedReview(jobId, job = null) {
+    return Boolean(job?.viewer_has_submitted_review)
+      || Store.getJobReviewIds().has(String(jobId));
+  },
+
+  syncJobViewerState(job) {
+    if (!job?.id) return;
+    if (job.viewer_has_signalled_completion) Store.markJobCompletionSignalled(job.id);
+    if (job.viewer_has_submitted_review) Store.markJobReviewSubmitted(job.id);
+  },
+
+  clearViewerState() {
+    localStorage.removeItem(CONFIG.APPLIED_JOBS_KEY);
+    localStorage.removeItem(CONFIG.JOB_COMPLETION_KEY);
+    localStorage.removeItem(CONFIG.JOB_REVIEWS_KEY);
+    localStorage.removeItem(CONFIG.CONVERSATIONS_KEY);
+  },
 };

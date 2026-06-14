@@ -152,8 +152,23 @@ const Utils = {
     return '★'.repeat(n) + '☆'.repeat(5 - n);
   },
 
+  formatJobStatus(status) {
+    const labels = {
+      open: 'Open',
+      filled: 'Filled',
+      pending_confirmation: 'Pending confirmation',
+      completed: 'Completed',
+      closed: 'Closed',
+      pending: 'Pending',
+      accepted: 'Accepted',
+      canceled: 'Canceled',
+    };
+    return labels[status] || String(status || '').replace(/_/g, ' ');
+  },
+
   statusBadge(status) {
-    return `<span class="badge badge-${Utils.escapeHtml(status)}">${Utils.escapeHtml(status)}</span>`;
+    const label = Utils.formatJobStatus(status);
+    return `<span class="badge badge-${Utils.escapeHtml(status)}">${Utils.escapeHtml(label)}</span>`;
   },
 
   showToast(message, type = 'info') {
@@ -216,6 +231,149 @@ const Utils = {
       document.removeEventListener('keydown', Utils._modalEscHandler);
       Utils._modalEscHandler = null;
     }
+    if (Utils._modalResolve) {
+      Utils._modalResolve(null);
+      Utils._modalResolve = null;
+    }
+  },
+
+  confirm({
+    title,
+    message = '',
+    confirmLabel = 'Confirm',
+    cancelLabel = 'Cancel',
+    danger = false,
+  } = {}) {
+    return new Promise((resolve) => {
+      Utils.closeModal();
+      Utils._modalResolve = resolve;
+
+      const messageHtml = message
+        ? `<p class="hm-modal-message">${Utils.escapeHtml(message).replace(/\n/g, '<br>')}</p>`
+        : '';
+      const confirmClass = danger ? 'btn btn-danger' : 'btn btn-primary';
+
+      const overlay = document.createElement('div');
+      overlay.id = 'app-modal';
+      overlay.className = 'modal-overlay hm-modal open';
+      overlay.setAttribute('role', 'alertdialog');
+      overlay.setAttribute('aria-modal', 'true');
+      overlay.innerHTML = `
+        <div class="hm-modal-panel">
+          <button type="button" class="hm-modal-close" aria-label="Close">×</button>
+          <div class="hm-modal-body">
+            <h3 class="hm-modal-title">${Utils.escapeHtml(title)}</h3>
+            ${messageHtml}
+          </div>
+          <div class="hm-modal-foot">
+            <button type="button" class="btn btn-ghost hm-modal-dismiss">${Utils.escapeHtml(cancelLabel)}</button>
+            <button type="button" class="${confirmClass} hm-modal-confirm">${Utils.escapeHtml(confirmLabel)}</button>
+          </div>
+        </div>`;
+
+      document.body.appendChild(overlay);
+      document.body.classList.add('hm-modal-open');
+
+      const finish = (value) => {
+        Utils._modalResolve = null;
+        Utils.closeModal();
+        resolve(value);
+      };
+
+      overlay.querySelector('.hm-modal-close')?.addEventListener('click', () => finish(false));
+      overlay.querySelector('.hm-modal-dismiss')?.addEventListener('click', () => finish(false));
+      overlay.querySelector('.hm-modal-confirm')?.addEventListener('click', () => finish(true));
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) finish(false);
+      });
+
+      Utils._modalEscHandler = (e) => {
+        if (e.key === 'Escape') finish(false);
+      };
+      document.addEventListener('keydown', Utils._modalEscHandler);
+
+      overlay.querySelector('.hm-modal-confirm')?.focus();
+    });
+  },
+
+  prompt({
+    title,
+    message = '',
+    placeholder = '',
+    confirmLabel = 'Submit',
+    cancelLabel = 'Cancel',
+    required = true,
+  } = {}) {
+    return new Promise((resolve) => {
+      Utils.closeModal();
+      Utils._modalResolve = resolve;
+
+      const overlay = document.createElement('div');
+      overlay.id = 'app-modal';
+      overlay.className = 'modal-overlay hm-modal open';
+      overlay.setAttribute('role', 'dialog');
+      overlay.setAttribute('aria-modal', 'true');
+      overlay.innerHTML = `
+        <div class="hm-modal-panel">
+          <button type="button" class="hm-modal-close" aria-label="Close">×</button>
+          <div class="hm-modal-body">
+            <h3 class="hm-modal-title">${Utils.escapeHtml(title)}</h3>
+            ${message ? `<p class="hm-modal-sub">${Utils.escapeHtml(message)}</p>` : ''}
+            <textarea id="hm-prompt-input" class="hm-modal-input" rows="4"
+              placeholder="${Utils.escapeHtml(placeholder)}"${required ? ' required' : ''}></textarea>
+            <p class="hm-modal-error" id="hm-prompt-error" hidden></p>
+          </div>
+          <div class="hm-modal-foot">
+            <button type="button" class="btn btn-ghost hm-modal-dismiss">${Utils.escapeHtml(cancelLabel)}</button>
+            <button type="button" class="btn btn-primary hm-modal-confirm">${Utils.escapeHtml(confirmLabel)}</button>
+          </div>
+        </div>`;
+
+      document.body.appendChild(overlay);
+      document.body.classList.add('hm-modal-open');
+
+      const input = overlay.querySelector('#hm-prompt-input');
+      const errorEl = overlay.querySelector('#hm-prompt-error');
+
+      const finish = (value) => {
+        Utils._modalResolve = null;
+        Utils.closeModal();
+        resolve(value);
+      };
+
+      const submit = () => {
+        const value = input?.value?.trim() || '';
+        if (required && !value) {
+          if (errorEl) {
+            errorEl.hidden = false;
+            errorEl.textContent = 'Please enter a description.';
+          }
+          input?.focus();
+          return;
+        }
+        finish(required ? value : (input?.value ?? ''));
+      };
+
+      overlay.querySelector('.hm-modal-close')?.addEventListener('click', () => finish(null));
+      overlay.querySelector('.hm-modal-dismiss')?.addEventListener('click', () => finish(null));
+      overlay.querySelector('.hm-modal-confirm')?.addEventListener('click', submit);
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) finish(null);
+      });
+      input?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          submit();
+        }
+      });
+
+      Utils._modalEscHandler = (e) => {
+        if (e.key === 'Escape') finish(null);
+      };
+      document.addEventListener('keydown', Utils._modalEscHandler);
+
+      input?.focus();
+    });
   },
 
   showModal({ title, subtitle = '', body = '', primaryLabel = 'OK', primaryPath = '', dismissLabel = 'Close' }) {

@@ -191,19 +191,12 @@ const Components = {
     return html;
   },
 
-  jobGridHeader({ title = 'Recommended jobs', count = 0, sort = 'updated' } = {}) {
+  jobGridHeader({ title = 'Recommended jobs', count = 0 } = {}) {
     return `
       <div class="job-grid-header">
         <div class="job-grid-header-left">
           <h2 class="job-grid-title">${Utils.escapeHtml(title)}</h2>
           ${count > 0 ? `<span class="job-grid-count">${count}</span>` : ''}
-        </div>
-        <div class="job-grid-header-right">
-          <span class="job-grid-sort-label">Sort by:</span>
-          <button type="button" class="job-grid-sort-btn" data-sort="updated" aria-label="Sort jobs">
-            <span>${sort === 'title' ? 'Title' : 'Last updated'}</span>
-            ${Icons.sort}
-          </button>
         </div>
       </div>`;
   },
@@ -228,7 +221,7 @@ const Components = {
         <div class="job-card-body">
           <div class="job-card-meta">
             <time class="job-card-date">${Utils.formatDateCard(job.posted_at)}</time>
-            <span class="job-card-status">${Utils.escapeHtml(job.status || 'open')}</span>
+            <span class="job-card-status">${Utils.escapeHtml(Utils.formatJobStatus(job.status || 'open'))}</span>
           </div>
           <span class="job-card-company">${Utils.escapeHtml(company)}</span>
           <h3 class="job-card-title">
@@ -254,7 +247,6 @@ const Components = {
       ${options.showHeader !== false ? Components.jobGridHeader({
         title: options.title,
         count: options.count ?? jobs.length,
-        sort: options.sort,
       }) : ''}
       <div class="job-grid">${jobs.map(Components.jobGridCard).join('')}</div>`;
   },
@@ -288,12 +280,48 @@ const Components = {
       </section>`;
   },
 
+  jobPartyActions(job, user, { compact = false } = {}) {
+    if (!job || !user) return '';
+    const isClient = user.role === 'client' && String(user.id) === String(job.client_id);
+    const isHiredFreelancer = user.role === 'freelancer' && job.viewer_is_hired;
+    if (!isClient && !isHiredFreelancer) return '';
+
+    const signalled = Store.hasSignalledCompletion(job.id, job);
+    const reviewed = Store.hasSubmittedReview(job.id, job);
+    const btnClass = compact ? 'btn btn-sm' : 'btn btn-block';
+    const doneClass = `${btnClass} is-done`;
+    const parts = [];
+
+    if (job.status === 'completed') {
+      parts.push(`<span class="job-action-status">${Utils.statusBadge('completed')}</span>`);
+    }
+
+    if (['filled', 'pending_confirmation'].includes(job.status)) {
+      if (signalled) {
+        parts.push(`<button type="button" class="${doneClass}" disabled aria-disabled="true">Completion signalled ✓</button>`);
+      } else {
+        parts.push(`<button type="button" class="${btnClass}${compact ? ' btn-primary' : ''} complete-job" data-job-id="${job.id}">Mark job complete</button>`);
+      }
+    }
+
+    if (job.viewer_can_submit_review) {
+      if (reviewed) {
+        parts.push(`<button type="button" class="${doneClass}" disabled aria-disabled="true">Review submitted ✓</button>`);
+      } else {
+        parts.push(`<a class="${btnClass} btn-primary" data-nav="/jobs/${job.id}/review">Submit review</a>`);
+      }
+    } else if (job.status === 'completed' && reviewed) {
+      parts.push(`<button type="button" class="${doneClass}" disabled aria-disabled="true">Review published ✓</button>`);
+    }
+
+    return parts.join('');
+  },
+
   jobDetailPage(job, actionsHtml = '') {
     const company = job.company_name || 'Company';
     const salary = Utils.formatMoney(job.salary_amount, job.salary_negotiable);
     const payLabel = salary === 'Negotiable' ? 'Negotiable' : salary !== '—' ? salary : 'Competitive';
-    const status = (job.status || 'open').replace(/_/g, ' ');
-    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+    const statusLabel = Utils.formatJobStatus(job.status || 'open');
     const skills = (job.required_skills || [])
       .map((s) => `<span class="job-detail-skill">${Utils.escapeHtml(s.name)}</span>`)
       .join('');
@@ -904,13 +932,23 @@ const Components = {
       </section>`;
   },
 
-  freelancerQuickActions(items) {
-    const icons = {
+  freelancerQuickActions(items, icons = {}) {
+    return Components.portalDashQuickActions(items, icons);
+  },
+
+  portalDashQuickActions(items, icons = {}) {
+    const defaultIcons = {
       '/freelancer/profile': Icons.user,
       '/freelancer/quizzes': Icons.book,
+      '/freelancer/jobs': Icons.jobs,
       '/jobs': Icons.jobs,
       '/messages': Icons.message,
+      '/client/dashboard': Icons.grid,
+      '/client/jobs/new': Icons.pen,
+      '/client/jobs': Icons.jobs,
+      '/client/profile': Icons.user,
     };
+    const iconMap = { ...defaultIcons, ...icons };
     return `
       <div class="freelancer-dash-actions">
         <div class="freelancer-dash-section-head">
@@ -920,7 +958,7 @@ const Components = {
         <div class="freelancer-dash-action-grid">
           ${items.map((item) => `
             <a class="freelancer-dash-action-card" data-nav="${item.path}">
-              <span class="freelancer-dash-action-icon" aria-hidden="true">${icons[item.path] || Icons.grid}</span>
+              <span class="freelancer-dash-action-icon" aria-hidden="true">${iconMap[item.path] || Icons.grid}</span>
               <span class="freelancer-dash-action-text">
                 <strong>${Utils.escapeHtml(item.label)}</strong>
                 ${item.hint ? `<span>${Utils.escapeHtml(item.hint)}</span>` : ''}
@@ -928,6 +966,137 @@ const Components = {
               <span class="freelancer-dash-action-arrow" aria-hidden="true">→</span>
             </a>`).join('')}
         </div>
+      </div>`;
+  },
+
+  clientDashboardHero(profile, stats = {}) {
+    const company = profile.company_name || 'Your company';
+    const avatarInner = profile.profile_picture_url
+      ? `<img class="freelancer-dash-avatar-img" src="${Utils.escapeHtml(Utils.resolveMediaUrl(profile.profile_picture_url))}" alt="">`
+      : `<span class="freelancer-dash-avatar-letter">${Utils.escapeHtml(Utils.initial(company))}</span>`;
+    const bio = String(profile.bio || '').trim();
+    const bioSnippet = bio.length > 140 ? `${bio.slice(0, 137)}…` : bio;
+    const stars = Utils.stars(profile.avg_rating);
+    const activeJobs = stats.activeJobs ?? 0;
+    const totalJobs = stats.totalJobs ?? 0;
+    const statusLabel = activeJobs > 0 ? `${activeJobs} active listing${activeJobs === 1 ? '' : 's'}` : 'No open listings';
+
+    return `
+      <section class="freelancer-dash-hero" aria-label="Company dashboard overview">
+        <div class="freelancer-dash-hero-glow" aria-hidden="true"></div>
+        <div class="freelancer-dash-hero-inner">
+          <div class="freelancer-dash-identity">
+            <div class="freelancer-dash-avatar" aria-hidden="true">${avatarInner}</div>
+            <div class="freelancer-dash-intro">
+              <p class="freelancer-dash-eyebrow">Company workspace</p>
+              <h1 class="freelancer-dash-name">${Utils.escapeHtml(company)}</h1>
+              <div class="freelancer-dash-status ${activeJobs > 0 ? 'is-available' : 'is-unavailable'}">
+                <span class="freelancer-dash-status-dot" aria-hidden="true"></span>
+                ${Utils.escapeHtml(statusLabel)}
+              </div>
+              ${bioSnippet ? `<p class="freelancer-dash-bio">${Utils.escapeHtml(bioSnippet)}</p>` : ''}
+            </div>
+            <a class="btn btn-sm freelancer-dash-edit-btn" data-nav="/client/profile">Edit profile</a>
+          </div>
+          <div class="freelancer-dash-stats">
+            <div class="freelancer-dash-stat">
+              <span class="freelancer-dash-stat-label">Rating</span>
+              <span class="freelancer-dash-stat-value freelancer-dash-stat-stars">${stars}</span>
+              <span class="freelancer-dash-stat-hint">${profile.review_count || 0} reviews</span>
+            </div>
+            <div class="freelancer-dash-stat">
+              <span class="freelancer-dash-stat-label">Active jobs</span>
+              <span class="freelancer-dash-stat-value">${activeJobs}</span>
+              <span class="freelancer-dash-stat-hint">Open listings</span>
+            </div>
+            <div class="freelancer-dash-stat">
+              <span class="freelancer-dash-stat-label">Total jobs</span>
+              <span class="freelancer-dash-stat-value">${totalJobs}</span>
+              <span class="freelancer-dash-stat-hint">All time posted</span>
+            </div>
+          </div>
+        </div>
+      </section>`;
+  },
+
+  clientProfilePage(profile) {
+    const company = profile.company_name || 'Your company';
+    const avatarInner = profile.profile_picture_url
+      ? `<img class="freelancer-profile-avatar-img" src="${Utils.escapeHtml(Utils.resolveMediaUrl(profile.profile_picture_url))}" alt="">`
+      : `<span class="freelancer-profile-avatar-letter">${Utils.escapeHtml(Utils.initial(company))}</span>`;
+
+    return `
+      <div class="portal-console freelancer-profile client-profile">
+        <section class="freelancer-profile-hero">
+          <div class="freelancer-profile-hero-main">
+            <div class="freelancer-profile-avatar">${avatarInner}</div>
+            <div class="freelancer-profile-hero-text">
+              <p class="freelancer-profile-eyebrow">Company profile</p>
+              <h1 class="freelancer-profile-title">${Utils.escapeHtml(company)}</h1>
+              <div class="freelancer-profile-status is-available">
+                <span class="freelancer-profile-status-dot" aria-hidden="true"></span>
+                Client account
+              </div>
+            </div>
+          </div>
+          <p class="freelancer-profile-hero-hint">Keep your company details and logo up to date for freelancers.</p>
+        </section>
+
+        <div class="freelancer-profile-layout">
+          <section class="freelancer-profile-card freelancer-profile-card-wide">
+            <div class="freelancer-profile-card-head">
+              <h2>Company details</h2>
+              <p>Name, bio, and website shown on your job listings.</p>
+            </div>
+            <form class="freelancer-profile-form" data-form="clientProfile" id="client-profile-form">
+              <div class="freelancer-profile-field">
+                <label for="field-company_name">Company name</label>
+                <input type="text" id="field-company_name" name="company_name" value="${Utils.escapeHtml(profile.company_name || '')}">
+              </div>
+              <div class="freelancer-profile-field">
+                <label for="field-bio">Bio</label>
+                <textarea id="field-bio" name="bio" rows="4">${Utils.escapeHtml(profile.bio || '')}</textarea>
+              </div>
+              <div class="freelancer-profile-field">
+                <label for="field-company_link">Website</label>
+                <input type="url" id="field-company_link" name="company_link" value="${Utils.escapeHtml(profile.company_link || '')}">
+              </div>
+            </form>
+            <div class="freelancer-profile-card-foot">
+              <button type="submit" form="client-profile-form" class="btn btn-primary">Save changes</button>
+            </div>
+          </section>
+
+          <div class="freelancer-profile-side">
+            <section class="freelancer-profile-card">
+              <div class="freelancer-profile-card-head">
+                <h2>Company logo</h2>
+                <p>Square image works best on job cards.</p>
+              </div>
+              <div class="freelancer-profile-media-preview" id="client-photo-preview">
+                ${profile.profile_picture_url
+                  ? `<img src="${Utils.escapeHtml(Utils.resolveMediaUrl(profile.profile_picture_url))}" alt="">`
+                  : `<span class="freelancer-profile-media-placeholder">${Utils.escapeHtml(Utils.initial(company))}</span>`}
+              </div>
+              ${Components.fileUpload({
+                id: 'client-picture',
+                accept: 'image/jpeg,image/png,image/webp',
+                label: 'Choose logo',
+                placeholder: 'JPG, PNG or WebP',
+                hint: 'Uploads automatically when selected.',
+                className: 'freelancer-profile-upload',
+              })}
+            </section>
+          </div>
+        </div>
+
+        <section class="freelancer-profile-danger">
+          <div>
+            <h2>Delete account</h2>
+            <p>Permanently remove your company account and all associated jobs.</p>
+          </div>
+          <button type="button" class="btn btn-ghost-danger" id="delete-client-profile">Delete company account</button>
+        </section>
       </div>`;
   },
 

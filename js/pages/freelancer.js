@@ -21,6 +21,7 @@ Object.assign(Pages, {
             { path: '/freelancer/profile', label: 'Edit profile', hint: 'Bio, links & resume' },
             { path: '/freelancer/quizzes', label: 'Take quizzes', hint: 'Earn skill badges' },
             { path: '/jobs', label: 'Browse jobs', hint: 'Find open roles' },
+            { path: '/freelancer/jobs', label: 'Previous jobs', hint: 'Complete work & review clients' },
             { path: '/messages', label: 'Messages', hint: 'Client conversations' },
           ])}
           ${Components.adminSecondaryPanel({
@@ -41,6 +42,50 @@ Object.assign(Pages, {
     const p = await Api.get('/freelancer/profile', { cache: false });
 
     return Components.freelancerProfilePage(p, p.portfolio_links || []);
+  },
+
+  async freelancerJobs() {
+    if (!Auth.requireRole(['freelancer'])) return '';
+    const params = Utils.getQueryParams();
+    const data = await Api.get('/jobs/engagements', {
+      query: { page: params.page || 1, limit: 20, status: params.status || undefined },
+    });
+    (data.items || []).forEach((job) => Store.syncJobViewerState(job));
+
+    const status = params.status || '';
+    const filters = `
+      <form class="admin-filter-form portal-filter-form" id="freelancer-jobs-filter">
+        <label class="admin-filter-field">
+          <span>Status</span>
+          <select name="status" id="freelancer-jobs-status">
+            <option value="">All statuses</option>
+            <option value="filled" ${status === 'filled' ? 'selected' : ''}>Filled</option>
+            <option value="pending_confirmation" ${status === 'pending_confirmation' ? 'selected' : ''}>Pending confirmation</option>
+            <option value="completed" ${status === 'completed' ? 'selected' : ''}>Completed</option>
+            <option value="closed" ${status === 'closed' ? 'selected' : ''}>Closed</option>
+          </select>
+        </label>
+      </form>`;
+
+    return PortalPages.wrap(
+      'Previous jobs',
+      'Mark work complete and submit reviews for clients you were hired by.',
+      `
+        ${Components.adminComposePanel({
+          label: 'Your engagements',
+          title: 'Hired jobs',
+          body: `
+            <p class="admin-form-hint">After a client selects you, the job appears here. Mark it complete when finished, then submit your review of the client.</p>
+            ${filters}`,
+          footer: '',
+        })}
+        ${Components.adminSecondaryPanel({
+          title: `Jobs (${data.total || 0})`,
+          body: `
+            ${PortalPages.freelancerJobsTable(data.items || [])}
+            ${Components.pagination(data.page, data.limit, data.total, '/freelancer/jobs', { status: status || undefined })}`,
+        })}`,
+    );
   },
 
   async freelancerQuizzes() {
@@ -232,7 +277,7 @@ FormHandlers.quizAttempt = async (form) => {
           <p>${(result.resources || []).join(' ')}</p>
           ${Components.recommendedCoursesBlock(result.recommended_courses || [])}
           <div class="portal-quiz-result-actions">
-            <button type="button" class="btn portal-quiz-retry-btn" onclick="location.reload()">Retry quiz</button>
+            <a class="btn portal-quiz-retry-btn" data-nav="/freelancer/quizzes/${quizId}">Retry quiz</a>
             <a class="btn btn-primary" data-nav="/freelancer/quizzes">All quizzes</a>
             <a class="btn btn-ghost" data-nav="/freelancer/dashboard">Back to dashboard</a>
           </div>`;
@@ -281,6 +326,11 @@ async function uploadFreelancerProfileFile(input, { path, successMessage, refres
 }
 
 document.addEventListener('change', async (e) => {
+  if (e.target.id === 'freelancer-jobs-status') {
+    Router.navigate(Utils.buildHash('/freelancer/jobs', {
+      status: e.target.value || undefined,
+    }).slice(1));
+  }
   if (e.target.id === 'profile-picture') {
     await uploadFreelancerProfileFile(e.target, {
       path: '/freelancer/profile/picture',
@@ -303,7 +353,14 @@ document.addEventListener('click', async (e) => {
   const deletePortfolioBtn = e.target.closest('[data-delete-portfolio]');
   if (deletePortfolioBtn) {
     const linkId = deletePortfolioBtn.dataset.deletePortfolio;
-    if (!linkId || !confirm('Remove this portfolio link?')) return;
+    if (!linkId) return;
+    const ok = await Utils.confirm({
+      title: 'Remove portfolio link?',
+      message: 'This link will be removed from your profile.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
     deletePortfolioBtn.disabled = true;
     try {
       await Api.delete(`/freelancer/portfolio/${linkId}`);
@@ -321,7 +378,13 @@ document.addEventListener('click', async (e) => {
   }
 
   if (e.target.id === 'delete-freelancer-profile') {
-    if (!confirm('Delete your account? This cannot be undone.')) return;
+    const ok = await Utils.confirm({
+      title: 'Delete your account?',
+      message: 'Permanently remove your freelancer profile. This cannot be undone.',
+      confirmLabel: 'Delete account',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await Api.delete('/freelancer/profile');
       Auth.clearSession();

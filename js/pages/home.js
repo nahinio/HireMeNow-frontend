@@ -44,7 +44,6 @@ const Pages = {
         jobs.forEach((job) => Store.cacheSkills(job.required_skills || []));
         slot.className = 'portal-job-grid feed-jobs-grid';
         slot.innerHTML = Components.jobGrid(jobs, {
-          sort: 'updated',
           emptyMessage: 'No open jobs yet',
           showHeader: false,
         });

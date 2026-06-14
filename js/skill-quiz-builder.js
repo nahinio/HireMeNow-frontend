@@ -155,8 +155,14 @@ const SkillQuizBuilder = {
     SkillQuizBuilder.renderList();
   },
 
-  removeQuestion(index) {
-    if (!confirm(`Remove question ${index + 1}?`)) return;
+  async removeQuestion(index) {
+    const ok = await Utils.confirm({
+      title: `Remove question ${index + 1}?`,
+      message: 'This question will be removed from the quiz draft.',
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
     SkillQuizBuilder.questions.splice(index, 1);
     SkillQuizBuilder.renderList();
     Utils.showToast('Question removed', 'success');

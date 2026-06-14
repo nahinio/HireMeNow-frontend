@@ -602,9 +602,13 @@ const AdminSkills = {
       return;
     }
     const label = name || 'this skill';
-    if (!confirm(`Delete "${label}"?\n\nThis removes the quiz, courses, badges, and job requirements tied to this skill.`)) {
-      return;
-    }
+    const ok = await Utils.confirm({
+      title: `Delete "${label}"?`,
+      message: 'This removes the quiz, courses, badges, and job requirements tied to this skill.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await Api.delete(`/admin/skills/${id}`);
       Api.invalidateCache('/admin/skills');
@@ -744,7 +748,13 @@ document.addEventListener('click', async (e) => {
     const id = deleteBtn.dataset.id;
     const name = deleteBtn.dataset.name || 'this user';
     const role = deleteBtn.dataset.role || 'user';
-    if (!confirm(`Permanently delete ${name}? Their ${role} profile will be removed and they cannot log in again.`)) return;
+    const ok = await Utils.confirm({
+      title: `Delete ${name}?`,
+      message: `Their ${role} profile will be removed and they cannot log in again.`,
+      confirmLabel: 'Delete profile',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await Api.delete(`/admin/users/${id}`);
       Utils.showToast(`${name} deleted`, 'success');
@@ -758,10 +768,21 @@ document.addEventListener('click', async (e) => {
   if (e.target.classList.contains('resolve-report')) {
     const id = e.target.dataset.id;
     const status = e.target.dataset.status;
-    const msg = status === 'approved'
-      ? 'Delete this reported user\'s profile permanently?'
-      : 'Dismiss this report without deleting the user?';
-    if (!confirm(msg)) return;
+    const ok = await Utils.confirm(
+      status === 'approved'
+        ? {
+            title: 'Delete reported profile?',
+            message: 'This permanently deletes the reported user\'s profile.',
+            confirmLabel: 'Delete profile',
+            danger: true,
+          }
+        : {
+            title: 'Dismiss report?',
+            message: 'The report will be closed without deleting the user.',
+            confirmLabel: 'Dismiss',
+          },
+    );
+    if (!ok) return;
     try {
       await Api.patch(`/admin/reports/${id}`, { status });
       AdminPages.invalidateMetrics();
@@ -781,7 +802,13 @@ document.addEventListener('click', async (e) => {
     }
   }
   if (e.target.classList.contains('delete-course')) {
-    if (!confirm('Delete course?')) return;
+    const ok = await Utils.confirm({
+      title: 'Delete course?',
+      message: 'This course will be removed from recommendations.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await Api.delete(`/admin/courses/${e.target.dataset.id}`);
       Utils.showToast('Course deleted', 'success');

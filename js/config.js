@@ -17,6 +17,8 @@ const CONFIG = {
   SKILLS_CACHE_KEY: 'hiremenow_skills_cache',
   SKILLS_CACHE_AT_KEY: 'hiremenow_skills_cache_at',
   APPLIED_JOBS_KEY: 'hiremenow_applied_jobs',
+  JOB_COMPLETION_KEY: 'hiremenow_job_completions',
+  JOB_REVIEWS_KEY: 'hiremenow_job_reviews',
   MESSAGE_POLL_MS: 5000,
   LOGO_URL: 'assets/logo.png',
   LOGO_ALT: 'HireMeNow',

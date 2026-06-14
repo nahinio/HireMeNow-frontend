@@ -1,96 +1,39 @@
-const JOB_DESCRIPTION_PLACEHOLDER = `About the role
-Summarize the project, team, and what success looks like in this role.
-
-Responsibilities
-• Primary deliverables and day-to-day tasks
-• Tools, frameworks, or workflows the freelancer will use
-• Collaboration with your team (design, product, engineering, etc.)
-• Quality standards, testing, or documentation expectations
-
-Requirements — Education
-Degree, certifications, or equivalent practical experience you will accept.
-
-Requirements — Experience
-Years of experience, portfolio examples, or must-have skills beyond the verified badges above.
-
-Requirements — Additional
-Nice-to-haves, timezone overlap, language, contract length, or working style preferences.
-
-Compensation & benefits
-Salary or rate (or write "Negotiable"), contract type, paid time off, learning budget, remote policy, etc.
-
-About the company
-Brief intro to your company — mission, industry, team size, and why freelancers enjoy working with you.`;
-
 Object.assign(Pages, {
   async clientDashboard() {
     if (!Auth.requireRole(['client'])) return '';
-    const profile = await Api.get('/client/profile');
-    const jobs = await Api.get('/jobs/mine', { query: { limit: 8 } }).catch(() => ({ items: [] }));
+    const [profile, openJobs, allJobs] = await Promise.all([
+      Api.get('/client/profile'),
+      Api.get('/jobs/mine', { query: { limit: 1, status: 'open' } }).catch(() => ({ total: 0, items: [] })),
+      Api.get('/jobs/mine', { query: { limit: 8 } }).catch(() => ({ total: 0, items: [] })),
+    ]);
+    const items = allJobs.items || [];
+    const activeJobs = openJobs.total ?? 0;
+    const totalJobs = allJobs.total ?? items.length;
 
-    return PortalPages.wrap(
-      profile.company_name,
-      'Company dashboard',
-      `
-        <div class="admin-kpi-grid portal-kpi-grid">
-          ${Components.adminKpiCard('Company rating', Utils.stars(profile.avg_rating), `${profile.review_count} reviews`)}
-          ${Components.adminKpiCard('Active jobs', jobs.total ?? jobs.items?.length ?? 0, 'Posted listings')}
+    return `
+      <div class="portal-console client-dash">
+        ${Components.clientDashboardHero(profile, { activeJobs, totalJobs })}
+        <div class="portal-console-body client-dash-body">
+          ${Components.portalDashQuickActions([
+            { path: '/client/jobs/new', label: 'Post a job', hint: 'Create a new listing' },
+            { path: '/client/jobs', label: 'Manage jobs', hint: 'View applicants' },
+            { path: '/client/profile', label: 'Company profile', hint: 'Edit details & logo' },
+            { path: '/messages', label: 'Messages', hint: 'Talk to freelancers' },
+          ])}
+          ${Components.adminSecondaryPanel({
+            title: 'Recent jobs',
+            linkHref: '/client/jobs',
+            linkLabel: 'View all →',
+            body: PortalPages.clientJobsTable(items),
+          })}
         </div>
-        ${PortalPages.quickActions([
-          { path: '/client/jobs/new', label: 'Post a job', hint: 'Create a new listing' },
-          { path: '/client/jobs', label: 'Manage jobs', hint: 'View applicants' },
-          { path: '/client/profile', label: 'Company profile', hint: 'Edit details & logo' },
-          { path: '/messages', label: 'Messages', hint: 'Talk to freelancers' },
-        ])}
-        ${Components.adminSecondaryPanel({
-          title: 'Recent jobs',
-          linkHref: '/client/jobs',
-          linkLabel: 'View all →',
-          body: PortalPages.clientJobsTable(jobs.items || []),
-        })}`,
-    );
+      </div>`;
   },
 
   async clientProfile() {
     if (!Auth.requireRole(['client'])) return '';
-    const p = await Api.get('/client/profile');
-
-    return PortalPages.wrap('Company profile', '', `
-      ${Components.adminComposePanel({
-        label: 'Company details',
-        title: 'Edit profile',
-        body: `
-          <form class="admin-compose-form" data-form="clientProfile" id="client-profile-form">
-            ${Components.field('Company name', 'company_name', 'text', p.company_name)}
-            ${Components.field('Bio', 'bio', 'textarea', p.bio, 'rows="4"')}
-            ${Components.field('Website', 'company_link', 'url', p.company_link || '')}
-          </form>`,
-        footer: '<button type="submit" form="client-profile-form" class="btn btn-primary">Save changes</button>',
-      })}
-      ${Components.adminComposePanel({
-        label: 'Branding',
-        title: 'Company logo',
-        body: `
-          <div id="client-photo-preview">
-          ${p.profile_picture_url ? `<img class="preview-img portal-preview-img" src="${Utils.escapeHtml(Utils.resolveMediaUrl(p.profile_picture_url))}" alt="">` : '<p class="admin-form-hint">Upload a square logo for your company profile.</p>'}
-          </div>
-          ${Components.fileUpload({
-            id: 'client-picture',
-            accept: 'image/jpeg,image/png,image/webp',
-            label: 'Choose logo',
-            placeholder: 'JPG, PNG or WebP',
-            hint: 'Uploads automatically when selected.',
-          })}`,
-        footer: '',
-      })}
-      ${Components.adminComposePanel({
-        label: 'Danger zone',
-        title: 'Delete account',
-        className: 'portal-danger-panel',
-        body: '<p class="admin-form-hint">Permanently delete your company account and all associated jobs.</p>',
-        footer: '<button type="button" class="btn btn-danger" id="delete-client-profile">Delete company account</button>',
-      })}`,
-    );
+    const p = await Api.get('/client/profile', { cache: false });
+    return Components.clientProfilePage(p);
   },
 
   async clientJobs() {
@@ -100,20 +43,23 @@ Object.assign(Pages, {
       query: { page: params.page || 1, limit: 20, status: params.status || undefined },
     });
 
-    return PortalPages.wrap('My jobs', '', `
-      ${Components.adminComposePanel({
-        label: 'New listing',
-        title: 'Post a job',
-        body: '<p class="admin-form-hint">Create a job listing and review ranked applicants.</p>',
-        footer: '<a class="btn btn-primary" data-nav="/client/jobs/new">Post new job</a>',
-      })}
-      ${Components.adminSecondaryPanel({
-        title: `All jobs (${data.total || 0})`,
-        body: `
-          ${PortalPages.clientJobsTable(data.items || [])}
-          ${Components.pagination(data.page, data.limit, data.total, '/client/jobs')}`,
-      })}`,
-    );
+    return `
+      <div class="portal-console client-dash">
+        <div class="portal-console-body client-dash-body">
+          ${Components.adminComposePanel({
+            label: 'New listing',
+            title: 'Post a job',
+            body: '<p class="admin-form-hint">Create a job listing and review ranked applicants.</p>',
+            footer: '<a class="btn btn-primary" data-nav="/client/jobs/new">Post new job</a>',
+          })}
+          ${Components.adminSecondaryPanel({
+            title: `All jobs (${data.total || 0})`,
+            body: `
+              ${PortalPages.clientJobsTable(data.items || [])}
+              ${Components.pagination(data.page, data.limit, data.total, '/client/jobs')}`,
+          })}
+        </div>
+      </div>`;
   },
 
   async clientJobNew() {
@@ -122,55 +68,98 @@ Object.assign(Pages, {
     const profile = await Api.get('/client/profile');
     const company = Utils.escapeHtml(profile.company_name || 'Your company');
 
-    return PortalPages.wrap(
-      'Post a job',
-      'List the role and choose which skills applicants must verify.',
-      `
-        <section class="job-post-card">
-          <form class="job-post-form" data-form="createJob" id="create-job-form">
-            <input type="hidden" name="company_name" value="${company}">
-            <p class="job-post-meta">Posting as <strong>${company}</strong></p>
+    return `
+      <div class="portal-console client-dash">
+        <div class="portal-console-body client-dash-body">
+          <section class="job-post-card">
+            <header class="job-post-card-head">
+              <p class="job-post-card-eyebrow">New listing</p>
+              <h1>Post a job</h1>
+              <p class="job-post-card-sub">List the role and choose which skills applicants must verify.</p>
+            </header>
+            <form class="job-post-form" data-form="createJob" id="create-job-form">
+              <input type="hidden" name="company_name" value="${company}">
+              <p class="job-post-meta">Posting as <strong>${company}</strong></p>
 
-            <div class="job-post-field">
-              <label for="job-title">Job title</label>
-              <input id="job-title" name="title" type="text" required
-                placeholder="e.g. Frontend developer" autocomplete="off">
-            </div>
-
-            <div class="job-post-field">
-              <span class="job-post-label">Required skills <span class="job-post-req">*</span></span>
-              ${Components.skillPicker(skills)}
-            </div>
-
-            <div class="job-post-field job-post-field-description">
-              <label for="job-description">Description</label>
-              <p class="job-post-hint">Use the sections below as a guide — replace each line with your job details before publishing.</p>
-              <textarea id="job-description" name="description" rows="16" required
-                class="job-post-description"
-                placeholder="${Utils.escapeHtml(JOB_DESCRIPTION_PLACEHOLDER)}"></textarea>
-            </div>
-
-            <details class="job-post-extra">
-              <summary>Cover image <span class="job-post-optional">optional</span></summary>
-              <div class="job-post-extra-body">
-                ${Components.fileUpload({
-                  id: 'job-thumbnail',
-                  accept: 'image/jpeg,image/png,image/webp',
-                  label: 'Choose image',
-                  placeholder: 'No file chosen',
-                })}
-                <input type="hidden" name="thumbnail_url" id="thumbnail-url">
-                <p id="thumbnail-status" class="hm-file-upload-hint">JPG, PNG or WebP · shown on the job listing</p>
+              <div class="job-post-field">
+                <label for="job-title">Job title</label>
+                <input id="job-title" name="title" type="text" required
+                  placeholder="e.g. Frontend developer" autocomplete="off">
               </div>
-            </details>
 
-            <div class="job-post-actions">
-              <a class="btn btn-ghost" data-nav="/client/jobs">Cancel</a>
-              <button type="submit" class="btn btn-primary">Publish job</button>
-            </div>
-          </form>
-        </section>`,
-    );
+              <div class="job-post-field">
+                <span class="job-post-label">Required skills <span class="job-post-req">*</span></span>
+                ${Components.skillPicker(skills)}
+              </div>
+
+              <div class="job-post-sections">
+                <p class="job-post-sections-title">Job details</p>
+
+                <div class="job-post-field">
+                  <label for="job-about-role">About the role <span class="job-post-req">*</span></label>
+                  <textarea id="job-about-role" name="about_role" rows="3" required
+                    placeholder="Summarize the project, team, and what success looks like in this role."></textarea>
+                </div>
+
+                <div class="job-post-field">
+                  <label for="job-responsibilities">Responsibilities <span class="job-post-req">*</span></label>
+                  <textarea id="job-responsibilities" name="responsibilities" rows="4" required
+                    placeholder="List day-to-day tasks, deliverables, tools, and collaboration expectations."></textarea>
+                </div>
+
+                <div class="job-post-field">
+                  <label for="job-req-education">Requirements — Education</label>
+                  <textarea id="job-req-education" name="requirements_education" rows="2"
+                    placeholder="e.g. BS in Computer Science or equivalent practical experience."></textarea>
+                </div>
+
+                <div class="job-post-field">
+                  <label for="job-req-experience">Requirements — Experience</label>
+                  <textarea id="job-req-experience" name="requirements_experience" rows="2"
+                    placeholder="e.g. 3+ years building production apps with the skills listed above."></textarea>
+                </div>
+
+                <div class="job-post-field">
+                  <label for="job-req-additional">Requirements — Additional</label>
+                  <textarea id="job-req-additional" name="requirements_additional" rows="2"
+                    placeholder="e.g. Git, CI/CD, timezone overlap, language, or nice-to-have skills."></textarea>
+                </div>
+
+                <div class="job-post-field">
+                  <label for="job-benefits">Compensation &amp; benefits</label>
+                  <textarea id="job-benefits" name="other_benefits" rows="2"
+                    placeholder="e.g. Remote-friendly, learning stipend, flexible hours, or stock options."></textarea>
+                </div>
+
+                <div class="job-post-field">
+                  <label for="job-company-description">About the company</label>
+                  <textarea id="job-company-description" name="company_description" rows="2"
+                    placeholder="Brief intro — mission, industry, team size, and why freelancers enjoy working with you."></textarea>
+                </div>
+              </div>
+
+              <details class="job-post-extra">
+                <summary>Cover image <span class="job-post-optional">optional</span></summary>
+                <div class="job-post-extra-body">
+                  ${Components.fileUpload({
+                    id: 'job-thumbnail',
+                    accept: 'image/jpeg,image/png,image/webp',
+                    label: 'Choose image',
+                    placeholder: 'No file chosen',
+                  })}
+                  <input type="hidden" name="thumbnail_url" id="thumbnail-url">
+                  <p id="thumbnail-status" class="hm-file-upload-hint">JPG, PNG or WebP · shown on the job listing</p>
+                </div>
+              </details>
+
+              <div class="job-post-actions">
+                <a class="btn btn-ghost" data-nav="/client/jobs">Cancel</a>
+                <button type="submit" class="btn btn-primary">Publish job</button>
+              </div>
+            </form>
+          </section>
+        </div>
+      </div>`;
   },
 
   async clientApplicants({ id }) {
@@ -178,20 +167,23 @@ Object.assign(Pages, {
     const job = await Api.get(`/jobs/${id}`);
     const data = await Api.get(`/jobs/${id}/applicants`);
 
-    return PortalPages.wrap('Applicants', job.title, `
-      ${Components.adminComposePanel({
-        label: 'Job status',
-        title: job.title,
-        body: `
-          <p class="admin-form-hint">${Utils.escapeHtml(job.company_name || '')}</p>
-          <div style="margin-top:0.5rem">${Utils.statusBadge(job.status)}</div>`,
-        footer: '<a class="btn btn-ghost" data-nav="/client/jobs">← Back to jobs</a>',
-      })}
-      ${Components.adminSecondaryPanel({
-        title: `Ranked applicants (${(data.items || []).length})`,
-        body: PortalPages.applicantsTable(data.items || [], { jobId: id, jobStatus: job.status }),
-      })}`,
-    );
+    return `
+      <div class="portal-console client-dash">
+        <div class="portal-console-body client-dash-body">
+          ${Components.adminComposePanel({
+            label: 'Job status',
+            title: job.title,
+            body: `
+              <p class="admin-form-hint">${Utils.escapeHtml(job.company_name || '')}</p>
+              <div style="margin-top:0.5rem">${Utils.statusBadge(job.status)}</div>`,
+            footer: '<a class="btn btn-ghost" data-nav="/client/jobs">← Back to jobs</a>',
+          })}
+          ${Components.adminSecondaryPanel({
+            title: `Ranked applicants (${(data.items || []).length})`,
+            body: PortalPages.applicantsTable(data.items || [], { jobId: id, jobStatus: job.status }),
+          })}
+        </div>
+      </div>`;
   },
 });
 
@@ -216,12 +208,20 @@ FormHandlers.createJob = async (form) => {
   const skillIds = [...form.querySelectorAll('input[name="skill_ids"]:checked')].map((el) => el.value);
   if (!skillIds.length) return Utils.showToast('Select at least one skill', 'error');
 
-  const description = (fd.get('description') || '').trim();
-  if (!description) return Utils.showToast('Add a short job description', 'error');
+  const aboutRole = (fd.get('about_role') || '').trim();
+  const responsibilities = (fd.get('responsibilities') || '').trim();
+  if (!aboutRole) return Utils.showToast('Add a short summary under About the role', 'error');
+  if (!responsibilities) return Utils.showToast('Add responsibilities for this role', 'error');
 
   const payload = {
     title: (fd.get('title') || '').trim(),
-    description,
+    about_role: aboutRole,
+    responsibilities,
+    requirements_education: (fd.get('requirements_education') || '').trim(),
+    requirements_experience: (fd.get('requirements_experience') || '').trim(),
+    requirements_additional: (fd.get('requirements_additional') || '').trim(),
+    other_benefits: (fd.get('other_benefits') || '').trim(),
+    company_description: (fd.get('company_description') || '').trim(),
     company_name: (fd.get('company_name') || '').trim(),
     required_skill_ids: skillIds,
     salary_negotiable: true,
@@ -245,7 +245,7 @@ document.addEventListener('change', async (e) => {
       await Auth.refreshUser();
       const preview = document.getElementById('client-photo-preview');
       if (preview && res?.url) {
-        preview.innerHTML = `<img class="preview-img portal-preview-img" src="${Utils.escapeHtml(Utils.cacheBustMediaUrl(res.url))}" alt="">`;
+        preview.innerHTML = `<img src="${Utils.escapeHtml(Utils.cacheBustMediaUrl(res.url))}" alt="">`;
       }
       e.target.value = '';
       Utils.syncFileUpload(e.target);
@@ -270,7 +270,13 @@ document.addEventListener('change', async (e) => {
 
 document.addEventListener('click', async (e) => {
   if (e.target.id === 'delete-client-profile') {
-    if (!confirm('Delete your company account?')) return;
+    const ok = await Utils.confirm({
+      title: 'Delete company account?',
+      message: 'Permanently delete your company account and all associated jobs.',
+      confirmLabel: 'Delete account',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await Api.delete('/client/profile');
       Auth.clearSession();
@@ -282,17 +288,20 @@ document.addEventListener('click', async (e) => {
   if (e.target.classList.contains('select-applicant')) {
     const applicationId = e.target.dataset.appId;
     const jobId = e.target.dataset.jobId;
-    if (!confirm('Select this applicant? Others will be rejected.')) return;
+    const ok = await Utils.confirm({
+      title: 'Select this applicant?',
+      message: 'All other applicants for this job will be rejected.',
+      confirmLabel: 'Select applicant',
+    });
+    if (!ok) return;
     try {
       const res = await Api.post(`/jobs/${jobId}/select`, { application_id: applicationId });
       const job = await Api.get(`/jobs/${jobId}`);
       Store.saveConversation(res.conversation, {
         job_title: job.title || 'Selected job',
-        freelancer_id: res.conversation.freelancer_id,
-        client_id: res.conversation.client_id,
       });
-      Utils.showToast('Applicant hired — conversation started with an automatic welcome message', 'success');
-      Router.navigate(`/messages/${res.conversation.id}`);
+      Utils.showToast('Applicant selected!', 'success');
+      Router.navigate('/messages');
     } catch (err) {
       Utils.showToast(Utils.parseApiError(err), 'error');
     }

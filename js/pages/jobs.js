@@ -8,22 +8,20 @@ Object.assign(Pages, {
       (s) => `<option value="${s.id}" ${s.id === skill_id ? 'selected' : ''}>${Utils.escapeHtml(s.name)}</option>`
     ).join('');
 
-    const sort = params.sort || 'updated';
     const chips = [];
-    const clearParams = { sort: sort !== 'updated' ? sort : undefined };
-    const keepParams = clearParams;
+    const clearParams = {};
 
     if (q) {
       chips.push({
         label: q,
-        params: { skill_id: skill_id || undefined, sort: keepParams.sort },
+        params: { skill_id: skill_id || undefined },
       });
     }
     if (skill_id) {
       const skill = skills.find((s) => s.id === skill_id);
       chips.push({
         label: skill?.name || 'Skill',
-        params: { q: q || undefined, sort: keepParams.sort },
+        params: { q: q || undefined },
       });
     }
 
@@ -43,7 +41,6 @@ Object.assign(Pages, {
           ],
           chips,
           clearParams,
-          keepParams,
         }),
         Components.filterCountBadge('Loading…', 'jobs-count-meta'),
       )}
@@ -56,7 +53,6 @@ Object.assign(Pages, {
     const page = Number(params.page) || 1;
     const q = params.q || '';
     const skill_id = params.skill_id || '';
-    const sort = params.sort || 'updated';
     const slot = document.getElementById('jobs-grid-slot');
 
     Store.ensureSkillsCache().then(() => {
@@ -83,12 +79,8 @@ Object.assign(Pages, {
       (data.items || []).forEach((j) => Store.cacheSkills(j.required_skills || []));
 
       let items = data.items || [];
-      if (sort === 'title') {
-        items = [...items].sort((a, b) => a.title.localeCompare(b.title));
-      }
 
       slot.innerHTML = Components.jobGrid(items, {
-        sort,
         emptyMessage: 'No jobs match your filters',
         showHeader: false,
       });
@@ -104,7 +96,7 @@ Object.assign(Pages, {
           data.limit,
           data.total,
           '/jobs',
-          { q: q || undefined, skill_id: skill_id || undefined, sort: sort !== 'updated' ? sort : undefined },
+          { q: q || undefined, skill_id: skill_id || undefined },
         );
         App.bindNavIn(pagSlot);
       }
@@ -121,9 +113,11 @@ Object.assign(Pages, {
       cache: false,
     });
     Store.cacheSkills(job.required_skills || []);
+    Store.syncJobViewerState(job);
 
     let actions = '';
     const hasApplied = Boolean(job.viewer_has_applied || Store.hasAppliedToJob(job.id));
+    const isClient = user?.role === 'client' && String(user?.id) === String(job.client_id);
 
     if (user?.role === 'freelancer' && job.status === 'open') {
       if (hasApplied) {
@@ -132,17 +126,14 @@ Object.assign(Pages, {
         actions += `<button type="button" class="btn btn-primary btn-block" id="apply-job" data-job-id="${job.id}">Apply to this job</button>`;
       }
     }
-    if (user?.role === 'client' && user.id === job.client_id) {
+    if (isClient) {
       actions += `<a class="btn btn-block" data-nav="/client/jobs/${job.id}/applicants">View applicants</a>`;
     }
-    if (user && (user.id === job.client_id || job.status !== 'open')) {
-      if (['filled', 'pending_confirmation'].includes(job.status)) {
-        actions += `<button class="btn btn-block" id="complete-job" data-job-id="${job.id}">Signal job complete</button>`;
+    if (user) {
+      actions += Components.jobPartyActions(job, user);
+      if (isClient || job.viewer_is_hired) {
+        actions += `<a class="btn btn-block" data-nav="/messages">Messages</a>`;
       }
-      if (job.status === 'pending_confirmation') {
-        actions += `<a class="btn btn-primary btn-block" data-nav="/jobs/${job.id}/review">Submit review</a>`;
-      }
-      actions += `<a class="btn btn-block" data-nav="/messages">Messages</a>`;
     }
 
     return `<div class="portal-console"><div class="portal-console-body">${Components.jobDetailPage(job, actions)}</div></div>`;
@@ -150,7 +141,26 @@ Object.assign(Pages, {
 
   async jobReview({ id }) {
     if (!Auth.requireRole(['freelancer', 'client'])) return '';
-    const job = await Api.get(`/jobs/${id}`);
+    const job = await Api.get(`/jobs/${id}`, { cache: false });
+    Store.syncJobViewerState(job);
+    const user = Auth.getUser();
+    const backPath = user?.role === 'freelancer' ? '/freelancer/jobs' : `/jobs/${id}`;
+
+    if (Store.hasSubmittedReview(id, job)) {
+      return PortalPages.wrap('Submit review', job.title, `
+        <div class="admin-empty-panel">
+          <p class="admin-form-hint">You already submitted your review for this job.</p>
+          <a class="btn btn-primary" data-nav="${backPath}">← Back</a>
+        </div>`);
+    }
+
+    if (!job.viewer_can_submit_review) {
+      return PortalPages.wrap('Submit review', job.title, `
+        <div class="admin-empty-panel">
+          <p class="admin-form-hint">Reviews unlock after both you and the other party mark the job complete.</p>
+          <a class="btn btn-primary" data-nav="${backPath}">← Back</a>
+        </div>`);
+    }
 
     return PortalPages.wrap('Submit review', job.title, `
       ${PortalPages.contentPanel(`
@@ -158,7 +168,9 @@ Object.assign(Pages, {
           ${Components.field('Rating (1-5)', 'rating', 'number', '5', 'min="1" max="5" required')}
           ${Components.field('Review (min 20 characters)', 'body', 'textarea', '', 'minlength="20" required rows="5"')}
           <p class="admin-form-hint">Reviews publish when both parties submit.</p>
-        </form>`, { footer: '<button type="submit" form="submit-review-form" class="btn btn-primary">Submit review</button>' })}`);
+        </form>`, { footer: `
+          <a class="btn btn-ghost" data-nav="${backPath}">← Back</a>
+          <button type="submit" form="submit-review-form" class="btn btn-primary">Submit review</button>` })}`);
   },
 });
 
@@ -204,32 +216,32 @@ document.addEventListener('click', async (e) => {
     return;
   }
 
-  if (e.target.id === 'complete-job') {
-    const jobId = e.target.dataset.jobId;
+  if (e.target.closest('.complete-job')) {
+    const btn = e.target.closest('.complete-job');
+    const jobId = btn.dataset.jobId;
+    if (!jobId) return;
+    btn.disabled = true;
     try {
       await Api.post(`/jobs/${jobId}/complete`);
-      Utils.showToast('Completion signalled', 'success');
+      Store.markJobCompletionSignalled(jobId);
+      Api.invalidateCache('/jobs');
+      Utils.showToast('Job marked complete', 'success');
       Router.render();
     } catch (err) {
+      btn.disabled = false;
+      if (err?.status === 409) {
+        Store.markJobCompletionSignalled(jobId);
+        Api.invalidateCache('/jobs');
+        Router.render();
+        Utils.showToast('Completion already signalled', 'success');
+        return;
+      }
       Utils.showToast(Utils.parseApiError(err), 'error');
     }
+    return;
   }
 });
 
-
-document.addEventListener('click', (e) => {
-  const sortBtn = e.target.closest('.job-grid-sort-btn');
-  if (!sortBtn || Router.getPath() !== '/jobs') return;
-  e.preventDefault();
-  const params = Utils.getQueryParams();
-  const next = (params.sort || 'updated') === 'updated' ? 'title' : 'updated';
-  Router.navigate(Utils.buildHash('/jobs', {
-    q: params.q || undefined,
-    skill_id: params.skill_id || undefined,
-    page: params.page || undefined,
-    sort: next,
-  }).slice(1));
-});
 
 FormHandlers.submitReview = async (form) => {
   const jobId = form.dataset.jobId;
@@ -239,9 +251,20 @@ FormHandlers.submitReview = async (form) => {
       rating: Number(fd.get('rating')),
       body: fd.get('body'),
     });
+    Store.markJobReviewSubmitted(jobId);
+    Api.invalidateCache('/jobs');
     Utils.showToast('Review submitted', 'success');
-    Router.navigate(`/jobs/${jobId}`);
+    const user = Auth.getUser();
+    Router.navigate(user?.role === 'freelancer' ? '/freelancer/jobs' : `/jobs/${jobId}`);
   } catch (err) {
+    if (err?.status === 409) {
+      Store.markJobReviewSubmitted(jobId);
+      Api.invalidateCache('/jobs');
+      Utils.showToast('Review already submitted', 'success');
+      const user = Auth.getUser();
+      Router.navigate(user?.role === 'freelancer' ? '/freelancer/jobs' : `/jobs/${jobId}`);
+      return;
+    }
     Utils.showToast(Utils.parseApiError(err), 'error');
   }
 };

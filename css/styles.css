@@ -1536,15 +1536,17 @@ body.layout-public-portal .admin-panel-secondary {
   grid-template-columns: repeat(3, 1fr);
 }
 
-/* ── Freelancer dashboard ── */
+/* ── Portal dashboard (freelancer & client) ── */
 
-.freelancer-dash {
+.freelancer-dash,
+.client-dash {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
 
-.freelancer-dash-body {
+.freelancer-dash-body,
+.client-dash-body {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -1818,14 +1820,16 @@ body.layout-public-portal .admin-panel-secondary {
   color: var(--text);
 }
 
-.freelancer-dash .admin-panel-secondary {
+.freelancer-dash .admin-panel-secondary,
+.client-dash .admin-panel-secondary {
   border-radius: 14px;
   border-color: var(--border-strong);
   background: var(--bg);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
 }
 
-.freelancer-dash .admin-panel-secondary .admin-panel-head h2 {
+.freelancer-dash .admin-panel-secondary .admin-panel-head h2,
+.client-dash .admin-panel-secondary .admin-panel-head h2 {
   font-size: 1rem;
   font-weight: 600;
   color: var(--text);
@@ -2520,6 +2524,11 @@ body.layout-public-portal .admin-panel-secondary {
   border-color: rgba(255, 255, 255, 0.32);
 }
 
+.job-detail-pill-status.job-detail-pill-completed {
+  background: rgba(46, 125, 50, 0.35);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
 .job-detail-pill-status.job-detail-pill-closed {
   background: rgba(0, 0, 0, 0.28);
   border-color: rgba(255, 255, 255, 0.22);
@@ -2836,6 +2845,27 @@ body.layout-public-portal .admin-panel-secondary {
   color: var(--text-secondary);
   cursor: default;
   opacity: 1;
+}
+
+.job-detail-actions .btn.is-done,
+.job-detail-actions .btn.is-done:disabled,
+.admin-row-actions .btn.is-done,
+.admin-row-actions .btn.is-done:disabled {
+  background: var(--bg-muted);
+  border-color: var(--border);
+  color: var(--text-secondary);
+  cursor: default;
+  opacity: 1;
+  pointer-events: none;
+}
+
+.job-action-status {
+  display: flex;
+  justify-content: center;
+}
+
+.job-detail-actions .job-action-status {
+  margin-bottom: 0.15rem;
 }
 
 .job-detail-actions .btn.is-applying {
@@ -3306,6 +3336,39 @@ body.layout-public-portal .admin-panel-secondary {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
+.client-dash .job-post-card {
+  max-width: none;
+}
+
+.job-post-card-head {
+  padding: 1.35rem 1.5rem 0;
+}
+
+.job-post-card-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.job-post-card-head h1 {
+  margin: 0;
+  font-family: var(--font-brand);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.job-post-card-sub {
+  margin: 0.45rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
 .job-post-form {
   padding: 1.35rem 1.5rem 1.5rem;
 }
@@ -3354,13 +3417,25 @@ body.layout-public-portal .admin-panel-secondary {
 
 .job-post-field textarea {
   resize: vertical;
-  min-height: 7rem;
+  min-height: 4.5rem;
   line-height: 1.5;
 }
 
-.job-post-field-description textarea.job-post-description {
-  min-height: 18rem;
-  line-height: 1.55;
+.job-post-sections {
+  margin-bottom: 1.35rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.job-post-sections-title {
+  margin: 0 0 1.1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.job-post-sections .job-post-field:last-child {
+  margin-bottom: 0;
 }
 
 .job-post-field input:focus,
@@ -5377,7 +5452,27 @@ body.layout-job-grid .sidebar-right { display: none; }
   border-radius: var(--radius-sm);
   background: var(--bg-muted);
   color: var(--text-secondary);
-  text-transform: capitalize;
+  text-transform: none;
+}
+
+.badge-completed {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.badge-pending_confirmation {
+  background: #fff8e1;
+  color: #f57f17;
+}
+
+.badge-filled {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.badge-open {
+  background: var(--bg-muted);
+  color: var(--text-secondary);
 }
 
 .tag {
@@ -6466,6 +6561,40 @@ body.hm-modal-open {
 .hm-modal-foot .btn {
   flex: 1;
   justify-content: center;
+}
+
+.hm-modal-message {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.hm-modal-input {
+  width: 100%;
+  margin-top: 0.85rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  resize: vertical;
+  min-height: 5.5rem;
+}
+
+.hm-modal-input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+.hm-modal-error {
+  margin: 0.55rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--danger);
 }
 
 @keyframes hm-modal-fade-in {

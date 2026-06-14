@@ -6,11 +6,16 @@ const App = {
     return path.startsWith('/freelancer')
       || path.startsWith('/messages')
       || path === '/jobs'
-      || /^\/jobs\/[^/]+$/.test(path);
+      || /^\/jobs\/[^/]+$/.test(path)
+      || /^\/jobs\/[^/]+\/review$/.test(path);
   },
 
   isClientPortalPath(path) {
-    return path.startsWith('/client') || path.startsWith('/messages');
+    return path.startsWith('/client')
+      || path.startsWith('/messages')
+      || path === '/jobs'
+      || /^\/jobs\/[^/]+$/.test(path)
+      || /^\/jobs\/[^/]+\/review$/.test(path);
   },
 
   isFreelancerPortalUser(user, path, loggedIn = Boolean(user && Auth.getToken())) {
@@ -288,13 +293,17 @@ const App = {
     if (user.role === 'freelancer') {
       return [
         { label: 'Dashboard', path: '/freelancer/dashboard' },
+        { label: 'Previous jobs', path: '/freelancer/jobs' },
         { label: 'Profile', path: '/freelancer/profile' },
       ];
     }
     if (user.role === 'client') {
       return [
+        { label: 'Dashboard', path: '/client/dashboard' },
+        { label: 'My jobs', path: '/client/jobs' },
+        { label: 'Profile', path: '/client/profile' },
+        { label: 'Messages', path: '/messages' },
         { label: 'Browse jobs', path: '/jobs' },
-        { label: 'Home', path: '/' },
       ];
     }
     return [];
@@ -350,6 +359,7 @@ const App = {
     if (user.role === 'freelancer') {
       items.push(
         { icon: Icons.grid, label: 'Dashboard', path: '/freelancer/dashboard' },
+        { icon: Icons.jobs, label: 'Previous jobs', path: '/freelancer/jobs' },
         { icon: Icons.user, label: 'Profile', path: '/freelancer/profile' },
         { icon: Icons.book, label: 'Quizzes', path: '/freelancer/quizzes' },
         { icon: Icons.message, label: 'Messages', path: '/messages' },
@@ -489,6 +499,7 @@ const App = {
     });
 
     Router.register('/freelancer/dashboard', Pages.freelancerDashboard);
+    Router.register('/freelancer/jobs', Pages.freelancerJobs);
     Router.register('/freelancer/profile', Pages.freelancerProfile);
     Router.register('/freelancer/quizzes', Pages.freelancerQuizzes);
     Router.register('/freelancer/quizzes/:id', Pages.freelancerQuizTake);
