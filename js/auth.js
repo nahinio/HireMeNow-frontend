@@ -37,11 +37,12 @@ const Auth = {
   },
 
   async register(payload) {
-    const user = await Api.post('/auth/register', payload, { auth: false });
+    await Api.post('/auth/register', payload, { auth: false });
     const loginData = await Api.post('/auth/login', {
       email: payload.email,
       password: payload.password,
     }, { auth: false });
+    localStorage.setItem(CONFIG.TOKEN_KEY, loginData.access_token);
     const me = await Api.get('/auth/me');
     Auth.setSession(loginData.access_token, me);
     return me;

@@ -56,7 +56,7 @@ Object.assign(Pages, {
             ${Components.authField('Display name', 'display_name', 'text', '', 'required placeholder="How clients will see you"')}
           </div>
           <div id="client-fields" hidden>
-            ${Components.authField('Company name', 'company_name', 'text', '', 'placeholder="Optional"')}
+            ${Components.authField('Company name', 'company_name', 'text', '', 'required placeholder="Your company or team name"')}
           </div>
           <button type="submit" class="btn btn-primary auth-submit">Create account</button>
         </form>`,
@@ -146,13 +146,28 @@ FormHandlers.adminLogin = async (form) => {
 
 FormHandlers.register = async (form) => {
   const fd = new FormData(form);
+  const role = fd.get('role') || 'freelancer';
   const payload = {
-    email: fd.get('email'),
+    email: String(fd.get('email') || '').trim(),
     password: fd.get('password'),
-    role: fd.get('role'),
+    role,
   };
-  if (payload.role === 'freelancer') payload.display_name = fd.get('display_name');
-  else payload.company_name = fd.get('company_name');
+
+  if (role === 'freelancer') {
+    const displayName = String(fd.get('display_name') || '').trim();
+    if (!displayName) {
+      Utils.showToast('Display name is required', 'error');
+      return;
+    }
+    payload.display_name = displayName;
+  } else {
+    const companyName = String(fd.get('company_name') || '').trim();
+    if (!companyName) {
+      Utils.showToast('Company name is required', 'error');
+      return;
+    }
+    payload.company_name = companyName;
+  }
 
   try {
     await Auth.register(payload);
@@ -211,6 +226,18 @@ function syncRegisterRoleFields(form) {
   const clientFields = document.getElementById('client-fields');
   if (freelancerFields) freelancerFields.hidden = !isFreelancer;
   if (clientFields) clientFields.hidden = isFreelancer;
+
+  const displayName = form?.querySelector('[name="display_name"]');
+  const companyName = form?.querySelector('[name="company_name"]');
+  if (displayName) {
+    displayName.required = isFreelancer;
+    displayName.disabled = !isFreelancer;
+  }
+  if (companyName) {
+    companyName.required = !isFreelancer;
+    companyName.disabled = isFreelancer;
+  }
+
   form?.querySelectorAll('.auth-role-option').forEach((el) => {
     const input = el.querySelector('input[type="radio"]');
     el.classList.toggle('is-active', input?.checked);
@@ -230,3 +257,11 @@ document.addEventListener('click', (e) => {
   if (!form) return;
   requestAnimationFrame(() => syncRegisterRoleFields(form));
 });
+
+const _authAfterRender = Router.afterRender.bind(Router);
+Router.afterRender = (path) => {
+  _authAfterRender(path);
+  if (path === '/register') {
+    syncRegisterRoleFields(document.querySelector('form[data-form="register"]'));
+  }
+};
